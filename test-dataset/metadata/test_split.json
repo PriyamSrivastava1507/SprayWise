@@ -1,0 +1,33 @@
+{
+    "dataset": "CWFID",
+    "split": "test",
+    "image_ids": [
+        1,
+        3,
+        4,
+        9,
+        10,
+        13,
+        15,
+        21,
+        22,
+        26,
+        29,
+        30,
+        32,
+        35,
+        39,
+        44,
+        47,
+        48,
+        54,
+        60
+    ],
+    "num_images": 20,
+    "mask_mapping": {
+        "0": "background",
+        "1": "crop",
+        "2": "weed",
+        "255": "ignore"
+    }
+}
