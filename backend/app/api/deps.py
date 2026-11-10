@@ -13,6 +13,8 @@ from app.core.database import SessionLocal
 from app.repositories.field_repository import FieldRepository
 from app.repositories.scan_repository import ScanRepository
 from app.services.analysis_service import AnalysisService
+from app.services.evaluation_service import EvaluationService
+from app.services.export_service import ExportService
 from app.services.field_service import FieldService
 from app.services.scan_service import ScanService
 
@@ -71,3 +73,15 @@ def get_field_service(db: DbDep) -> FieldService:
 
 ScanServiceDep = Annotated[ScanService, Depends(get_scan_service)]
 FieldServiceDep = Annotated[FieldService, Depends(get_field_service)]
+
+
+def get_export_service(db: DbDep, storage: StorageDep) -> ExportService:
+    return ExportService(ScanRepository(db), storage)
+
+
+def get_evaluation_service(settings: SettingsDep) -> EvaluationService:
+    return EvaluationService(settings.evaluation_dir)
+
+
+ExportServiceDep = Annotated[ExportService, Depends(get_export_service)]
+EvaluationServiceDep = Annotated[EvaluationService, Depends(get_evaluation_service)]

@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     # Persistence
     database_url: str = "sqlite:///./data/spraywise.db"
     storage_dir: str = "./data/media"
+    evaluation_dir: str = "./data/evaluation"  # classical.json, ml.json written by scripts/evaluate.py
 
     # ML segmentation client:
     #   fake        - artificial demo mask (development, frontend work)
@@ -20,6 +21,8 @@ class Settings(BaseSettings):
     segmentation_backend: Literal["fake", "unavailable", "hf"] = "fake"
     hf_model_id: str = "YOUR_USERNAME/cropweed-segformer-b0"
     hf_token: str | None = None
+
+    log_level: str = "INFO"
 
     # Uploads and processing
     max_upload_mb: int = 10
