@@ -66,5 +66,5 @@
         60
     ],
     "random_seed": 42,
-    "source": "CWFID official split, with duplicate image 28 retained in train"
+    "source": "CWFID dataset split used for final training"
 }

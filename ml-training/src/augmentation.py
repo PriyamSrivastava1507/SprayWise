@@ -7,7 +7,7 @@ class SegmentationAugmentation:
     def __init__(
         self,
         horizontal_flip_prob=0.5,
-        vertical_flip_prob=0.5,
+        vertical_flip_prob=0.1,
         rotation_prob=0.5,
         brightness_contrast_prob=0.5
     ):
@@ -18,21 +18,21 @@ class SegmentationAugmentation:
 
     def __call__(self, image, mask):
 
-        # Random horizontal flip
+        # Horizontal flip
         if random.random() < self.horizontal_flip_prob:
             image = cv2.flip(image, 1)
             mask = cv2.flip(mask, 1)
 
-        # Random vertical flip
+        # Occasional vertical flip
         if random.random() < self.vertical_flip_prob:
             image = cv2.flip(image, 0)
             mask = cv2.flip(mask, 0)
 
-        # Random rotation between -15 and +15 degrees
+        # Rotation between -10 and +10 degrees
         if random.random() < self.rotation_prob:
             height, width = image.shape[:2]
 
-            angle = random.uniform(-15, 15)
+            angle = random.uniform(-10, 10)
 
             matrix = cv2.getRotationMatrix2D(
                 (width / 2, height / 2),
@@ -57,10 +57,10 @@ class SegmentationAugmentation:
                 borderValue=255
             )
 
-        # Random brightness and contrast adjustment
+        # Brightness and contrast
         if random.random() < self.brightness_contrast_prob:
-            alpha = random.uniform(0.8, 1.2)  # Contrast
-            beta = random.uniform(-0.1, 0.1)  # Brightness
+            alpha = random.uniform(0.9, 1.1)
+            beta = random.uniform(-0.05, 0.05)
 
             image = image * alpha + beta
             image = np.clip(image, 0.0, 1.0)

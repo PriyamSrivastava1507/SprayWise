@@ -8,6 +8,8 @@
 .env.*
 !.env.example
 !.env.*.example
+# Avoid duplicate compressed dataset
+cwfid_training_data.zip
 
 # Python
 __pycache__/
