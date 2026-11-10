@@ -13,6 +13,8 @@ from app.core.database import SessionLocal
 from app.repositories.field_repository import FieldRepository
 from app.repositories.scan_repository import ScanRepository
 from app.services.analysis_service import AnalysisService
+from app.services.field_service import FieldService
+from app.services.scan_service import ScanService
 
 
 def get_db() -> Iterator[Session]:
@@ -57,3 +59,15 @@ def get_analysis_service(
 
 
 AnalysisServiceDep = Annotated[AnalysisService, Depends(get_analysis_service)]
+
+
+def get_scan_service(db: DbDep, storage: StorageDep) -> ScanService:
+    return ScanService(ScanRepository(db), storage)
+
+
+def get_field_service(db: DbDep) -> FieldService:
+    return FieldService(FieldRepository(db), ScanRepository(db))
+
+
+ScanServiceDep = Annotated[ScanService, Depends(get_scan_service)]
+FieldServiceDep = Annotated[FieldService, Depends(get_field_service)]
