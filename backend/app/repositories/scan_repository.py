@@ -62,6 +62,17 @@ class ScanRepository:
             query = query.where(Scan.field_id == field_id)
         return self.db.scalar(query) or 0
 
+    def commit(self) -> None:
+        try:
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
+
+    def discard(self) -> None:
+        """Throw away unsaved changes to loaded scans."""
+        self.db.rollback()
+
     def delete(self, scan: Scan) -> None:
         self.db.delete(scan)
         self.db.commit()

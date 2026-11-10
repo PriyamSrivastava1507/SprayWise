@@ -3,9 +3,24 @@
 import { h, loadImage } from '../../utils/dom.js';
 import { mediaUrl } from '../../services/api.js';
 import { densest, heatColor } from '../../utils/calculations.js';
-import { drawZones } from './layer-viewer.js';
+import { drawZones, zoneAt } from './map-paint.js';
+import { ZoneTooltip } from './zone-tooltip.js';
 
 const W = 480;
+
+/** Wrap a zone canvas so hovering it describes the zone underneath. */
+function withTooltip(canvas, scan, result) {
+  const wrap = h('div', { class: 'mini-map' }, canvas);
+  const tip = ZoneTooltip(wrap);
+  canvas.addEventListener('pointermove', (e) => {
+    if (e.pointerType === 'touch') return;
+    const r = canvas.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    tip.show(zoneAt(scan, result, x, y, r.width, r.height), x, y, scan.params.cell_threshold);
+  });
+  canvas.addEventListener('pointerleave', () => tip.hide());
+  return wrap;
+}
 
 function sizeFor(scan) {
   return { width: W, height: Math.round(W * scan.height / scan.width) };
@@ -33,7 +48,7 @@ export function HeatMap(scan, result) {
   const maxPct = Math.round(top.value * 100);
   return h('section', { class: 'mini' },
     h('h3', {}, 'Weed density'),
-    canvas,
+    withTooltip(canvas, scan, result),
     h('div', { class: 'key' }, h('span', {}, 'None'), h('span', { class: 'ramp', 'aria-hidden': 'true' }), h('span', {}, maxPct + '%')),
     h('p', { class: 'note' }, top.value > 0
       ? 'Densest zone: row ' + (top.row + 1) + ', column ' + (top.col + 1) + ', ' + maxPct + '% weeds.'
@@ -60,7 +75,7 @@ export function SprayMap(scan, result) {
   const pct = Math.round(scan.params.cell_threshold * 100);
   return h('section', { class: 'mini' },
     h('h3', {}, 'Spray zones'),
-    canvas,
+    withTooltip(canvas, scan, result),
     h('p', { class: 'note' }, result.spray_cells.length
       ? 'Zones where weeds cover more than ' + pct + '% are sprayed. The rest of the field is skipped.'
       : 'No zone has more than ' + pct + '% weed cover, so nothing needs spraying.'));

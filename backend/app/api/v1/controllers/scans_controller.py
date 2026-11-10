@@ -4,7 +4,8 @@ from typing import Annotated, Optional
 
 from fastapi import APIRouter, Query, Response
 
-from app.api.deps import ScanServiceDep
+from app.api.deps import RecalculationServiceDep, ScanServiceDep
+from app.schemas.analysis import ScanSettings
 from app.schemas.common import ErrorResponse, Page
 from app.schemas.scan import ScanDetail
 
@@ -31,3 +32,21 @@ def get_scan(scan_id: int, service: ScanServiceDep) -> ScanDetail:
 def delete_scan(scan_id: int, service: ScanServiceDep) -> Response:
     service.delete(scan_id)
     return Response(status_code=204)
+
+
+@router.post(
+    "/{scan_id}/recalculate",
+    response_model=ScanDetail,
+    summary="Recalculate zones and savings with other settings",
+    responses={
+        **NOT_FOUND,
+        409: {"model": ErrorResponse, "description": "No saved mask to recalculate from"},
+    },
+)
+def recalculate_scan(
+    scan_id: int,
+    body: ScanSettings,
+    service: RecalculationServiceDep,
+    save: Annotated[bool, Query(description="false = preview only, true = update the scan")] = False,
+) -> ScanDetail:
+    return service.recalculate(scan_id, body, save)

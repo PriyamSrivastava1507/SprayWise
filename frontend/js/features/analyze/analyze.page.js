@@ -18,6 +18,7 @@ function Intro() {
 
 export function mount(root) {
   const ctrl = new AbortController();
+  let view = null;
   const out = h('section', { class: 'workspace-main', 'aria-live': 'polite' }, Intro());
 
   const form = AnalysisForm({
@@ -25,7 +26,9 @@ export function mount(root) {
       out.replaceChildren(Loader(fd.get('mode') === 'compare' ? 'Running both methods on the photo…' : 'Analyzing the photo…'));
       try {
         const scan = await analysisApi.analyze(fd, ctrl.signal);
-        out.replaceChildren(ScanView(scan, { onRerun: (mode) => form.submitWithMode(mode) }));
+        if (view) view.dispose();
+        view = ScanView(scan, { onRerun: (mode) => form.submitWithMode(mode) });
+        out.replaceChildren(view);
         toast('Scan ' + scan.id + ' saved to History.');
         if (matchMedia('(max-width: 860px)').matches) out.scrollIntoView({ behavior: 'smooth', block: 'start' });
       } catch (err) {
@@ -37,5 +40,5 @@ export function mount(root) {
   });
 
   root.replaceChildren(h('div', { class: 'workspace' }, h('aside', { class: 'workspace-side' }, form), out));
-  return () => ctrl.abort();
+  return () => { ctrl.abort(); if (view) view.dispose(); };
 }

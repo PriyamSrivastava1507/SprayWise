@@ -11,6 +11,7 @@ import {
 } from '../../utils/formatters.js';
 import { LayerViewer } from './layer-viewer.js';
 import { HeatMap, SprayMap } from './grid-map.js';
+import { AdjustPanel, canAdjust } from './adjust-panel.js';
 
 // ---------------------------------------------------------------- tags
 
@@ -67,14 +68,15 @@ export function StatusPanel(scan, result, { onRerun } = {}) {
 
 // ---------------------------------------------------------------- ok results
 
-function Answer(scan, result) {
+function Answer(scan, result, enter = true) {
   const total = scan.params.grid_rows * scan.params.grid_cols;
   const n = result.spray_cells.length;
   const s = result.savings;
   let head;
-  if (n === 0) head = h('h1', { class: 'answer' }, 'No zones need spraying.');
-  else if (n === total) head = h('h1', { class: 'answer' }, 'Spray all ', h('em', {}, String(total)), ' zones.');
-  else head = h('h1', { class: 'answer' }, 'Spray ', h('em', {}, n + ' of ' + total), ' zones.');
+  const cls = 'answer' + (enter ? ' enter' : '');
+  if (n === 0) head = h('h1', { class: cls }, 'No zones need spraying.');
+  else if (n === total) head = h('h1', { class: cls }, 'Spray all ', h('em', {}, String(total)), ' zones.');
+  else head = h('h1', { class: cls }, 'Spray ', h('em', {}, n + ' of ' + total), ' zones.');
 
   const sub = n === total
     ? h('p', { class: 'answer-sub' }, 'Weeds are spread across the whole photo, so spot spraying saves nothing here. Spraying all ',
@@ -85,7 +87,7 @@ function Answer(scan, result) {
   return [head, sub];
 }
 
-function Readout(scan, result) {
+function Readout(scan, result, dirty = false) {
   const soil = result.vegetation_pct == null ? null : Math.max(0, 100 - result.vegetation_pct);
   const pct = (v) => Math.max(0, v || 0) + '%';
   const scale = h('div', { class: 'scale-wrap' });
@@ -124,10 +126,15 @@ function Readout(scan, result) {
       h('div', { class: 'pressure-line' }, h('h3', {}, 'Weed pressure'), PressureTag(result.pressure)),
       scale),
     h('dl', { class: 'kv-mini' }, kv.map(([k, v]) => h('div', {}, h('dt', {}, k), h('dd', {}, v)))),
-    Downloads(scan, result));
+    Downloads(scan, result, dirty));
 }
 
-export function Downloads(scan, result) {
+export function Downloads(scan, result, dirty = false) {
+  if (dirty) {
+    return h('div', { class: 'downloads' },
+      h('button', { type: 'button', class: 'btn btn-quiet', disabled: true, title: 'Save the new settings to download them' }, 'CSV'),
+      h('button', { type: 'button', class: 'btn btn-quiet', disabled: true, title: 'Save the new settings to download them' }, 'PDF report'));
+  }
   return h('div', { class: 'downloads' },
     h('a', { class: 'btn btn-quiet', href: scansApi.exportUrl(scan.id, 'csv', result.method) }, 'CSV'),
     h('a', { class: 'btn btn-quiet', href: scansApi.exportUrl(scan.id, 'pdf', result.method) }, 'PDF report'));
@@ -147,15 +154,30 @@ function CostTable(scan, result) {
       ' per litre. Assumes cost scales with sprayed area; nozzle overlap is not counted.'));
 }
 
-/** The full view of one result (Analyze page and scan detail). */
-export function ResultPanel(scan, result, { onRerun } = {}) {
+/**
+ * The full view of one result (Analyze page and scan detail).
+ * update(scan, result, dirty) redraws it in place for recalculation previews,
+ * keeping the map's images, zoom and layer switches.
+ */
+export function ResultPanel(scan, result, { onRerun, adjust } = {}) {
   if (result.status !== 'ok') {
-    return h('div', { class: 'result' }, StatusPanel(scan, result, { onRerun }));
+    const el = h('div', { class: 'result' }, StatusPanel(scan, result, { onRerun }));
+    el.update = () => {};
+    return el;
   }
-  return h('div', { class: 'result' },
-    ...Answer(scan, result),
-    h('div', { class: 'map-block' }, LayerViewer(scan, result), Readout(scan, result)),
-    h('div', { class: 'lower' }, HeatMap(scan, result), SprayMap(scan, result), CostTable(scan, result)));
+  const answer = h('div', { class: 'answer-wrap' }, ...Answer(scan, result));
+  const viewer = LayerViewer(scan, result);
+  const readout = h('div', { class: 'readout-slot' }, Readout(scan, result));
+  const lower = h('div', { class: 'lower' }, HeatMap(scan, result), SprayMap(scan, result), CostTable(scan, result));
+  const el = h('div', { class: 'result' }, answer, h('div', { class: 'map-block' }, viewer, readout), adjust || null, lower);
+  el.update = (nextScan, nextResult, dirty) => {
+    answer.replaceChildren(...Answer(nextScan, nextResult, false));
+    viewer.update(nextScan, nextResult);
+    readout.replaceChildren(Readout(nextScan, nextResult, dirty));
+    lower.replaceChildren(HeatMap(nextScan, nextResult), SprayMap(nextScan, nextResult), CostTable(nextScan, nextResult));
+    el.classList.toggle('is-preview', dirty);
+  };
+  return el;
 }
 
 // ---------------------------------------------------------------- the scan
@@ -173,19 +195,38 @@ export function ScanMeta(scan, result, extra) {
 
 export function ScanView(scan, { method, onRerun } = {}) {
   const root = h('div', { class: 'scan-view' });
-  const initial = scan.results.find((r) => r.method === method) ||
-    scan.results.find((r) => r.status === 'ok') || scan.results[0];
+  let shown = scan;        // what is on screen: saved, or a preview
+  let dirty = false;
+  let active = (scan.results.find((r) => r.method === method) ||
+    scan.results.find((r) => r.status === 'ok') || scan.results[0]).method;
+  let panel = null;
 
-  function show(result) {
-    const tabs = scan.results.length > 1
+  const adjust = canAdjust(scan) ? AdjustPanel(scan, {
+    onPreview: (next, isDirty) => { shown = next; dirty = isDirty; refresh(); },
+    onSaved: (next) => { shown = next; dirty = false; refresh(); },
+  }) : null;
+
+  const resultOf = (s) => s.results.find((r) => r.method === active);
+
+  function refresh() {
+    const r = resultOf(shown);
+    if (panel && r.status === 'ok') panel.update(shown, r, dirty);
+  }
+
+  function show() {
+    const result = resultOf(shown);
+    const tabs = shown.results.length > 1
       ? h('div', { class: 'method-tabs', role: 'tablist', 'aria-label': 'Method' },
-        scan.results.map((r) => h('button', {
-          type: 'button', role: 'tab', 'aria-selected': String(r === result),
-          onclick: () => show(r),
+        shown.results.map((r) => h('button', {
+          type: 'button', role: 'tab', 'aria-selected': String(r.method === active),
+          onclick: () => { active = r.method; show(); },
         }, methodLabel(r.method), r.status !== 'ok' ? h('span', { class: 'tab-note' }, 'no result') : null)))
       : null;
-    root.replaceChildren(...[ScanMeta(scan, result), tabs, ResultPanel(scan, result, { onRerun })].filter(Boolean));
+    panel = ResultPanel(shown, result, { onRerun, adjust: result.status === 'ok' ? adjust : null });
+    if (dirty) panel.update(shown, result, true);
+    root.replaceChildren(...[ScanMeta(shown, result), tabs, panel].filter(Boolean));
   }
-  show(initial);
+  show();
+  root.dispose = () => { if (adjust) adjust.dispose(); };
   return root;
 }

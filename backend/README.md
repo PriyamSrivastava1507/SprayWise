@@ -41,6 +41,7 @@ Docker: `docker build -t spraywise-backend . && docker run -p 8000:8000 -v spray
 | `POST /analyze` | multipart: `file`, `mode` (classical/ml/compare), `field_id` or `field_name`, `area_ha`, `dose_l_per_ha`, `price_per_l`, `grid_rows`, `grid_cols`, `cell_threshold` → 201 scan |
 | `GET /scans`, `GET /scans/{id}`, `DELETE /scans/{id}` | history (`field_id`, `limit`, `offset`) |
 | `GET/POST /fields`, `GET /fields/{id}`, `GET /fields/{id}/trend?method=` | fields and weed trend |
+| `POST /scans/{id}/recalculate?save=` | JSON `area_ha`, `dose_l_per_ha`, `price_per_l`, `grid_rows`, `grid_cols`, `cell_threshold` → the scan recalculated from its saved masks; `save=false` previews, `save=true` updates it (409 if it has no saved mask) |
 | `GET /scans/{id}/export/csv\|pdf?method=` | downloads |
 | `GET /evaluation` | stored metrics, `null` when not evaluated yet |
 | `GET /media/...` | original photos and overlays (outside `/api/v1`) |
