@@ -20,6 +20,7 @@ from app.clients.factory import build_segmentation_client, build_storage_client
 from app.core.config import Settings, settings as default_settings
 from app.core.database import init_db
 from app.core.exceptions import AppError
+from app.core.logging import RequestLogMiddleware, configure_logging
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +75,7 @@ def create_app(
     init_database: bool = True,
 ) -> FastAPI:
     cfg = settings or default_settings
+    configure_logging(cfg.log_level)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -103,7 +105,9 @@ def create_app(
         allow_origins=cfg.allowed_origins,
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=["X-Request-ID", "Content-Disposition"],
     )
+    app.add_middleware(RequestLogMiddleware)
     register_error_handlers(app)
     app.include_router(api_router, prefix="/api/v1")
 

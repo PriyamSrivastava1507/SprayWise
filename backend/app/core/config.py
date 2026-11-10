@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     hf_model_id: str = "YOUR_USERNAME/cropweed-segformer-b0"
     hf_token: str | None = None
 
+    log_level: str = "INFO"
+
     # Uploads and processing
     max_upload_mb: int = 10
     working_width: int = 1024

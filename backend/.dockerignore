@@ -1,0 +1,13 @@
+.venv
+.env
+.git
+__pycache__
+.pytest_cache
+data
+tests
+test_samples
+my_photos
+tune_samples
+row_photos
+debug_out
+row_debug

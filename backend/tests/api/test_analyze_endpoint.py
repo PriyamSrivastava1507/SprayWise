@@ -127,3 +127,17 @@ def test_unexpected_error_hides_details(make_client, monkeypatch):
     error = error_of(response)
     assert error["code"] == "internal_error"
     assert "secret" not in error["message"]
+
+
+def test_every_response_has_request_id(client):
+    ok = client.get("/api/v1/health")
+    missing = client.get("/api/v1/nope")
+    assert ok.headers["x-request-id"] and missing.headers["x-request-id"]
+    assert ok.headers["x-request-id"] != missing.headers["x-request-id"]
+
+
+def test_download_filename_is_visible_to_browsers(client):
+    response = client.get(
+        "/api/v1/health", headers={"Origin": "http://localhost:5173"}
+    )
+    assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
