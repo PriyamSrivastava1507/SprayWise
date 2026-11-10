@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 
@@ -9,15 +10,23 @@ class LocalStorageClient:
         self.root.mkdir(parents=True, exist_ok=True)
 
     def _path(self, key: str) -> Path:
+        """Resolve a key to a path guaranteed to stay inside the root.
+
+        Rejects ``../`` and absolute keys, and the root itself (empty key or ``.``).
+        """
         resolved = (self.root / key).resolve()
-        if not resolved.is_relative_to(self.root):
+        if resolved == self.root or not resolved.is_relative_to(self.root):
             raise ValueError("bad storage key")
         return resolved
 
     def save(self, key: str, data: bytes) -> str:
         target_path = self._path(key)
         target_path.parent.mkdir(parents=True, exist_ok=True)
-        target_path.write_bytes(data)
+
+        # Write then rename, so a crash never leaves a half-written file.
+        temp_path = target_path.with_name(target_path.name + ".tmp")
+        temp_path.write_bytes(data)
+        os.replace(temp_path, target_path)
         return key
 
     def read(self, key: str) -> bytes:
@@ -31,5 +40,14 @@ class LocalStorageClient:
         return f"/media/{normalized_key}"
 
     def delete(self, key: str) -> None:
-        self._path(key).unlink(missing_ok=True)
+        path = self._path(key)
+        path.unlink(missing_ok=True)
 
+        # Remove the per-scan folder once it is empty (never the root itself).
+        parent = path.parent
+        while parent != self.root:
+            try:
+                parent.rmdir()
+            except OSError:
+                break
+            parent = parent.parent

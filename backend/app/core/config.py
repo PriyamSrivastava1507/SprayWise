@@ -2,6 +2,7 @@
 
 from typing import Literal
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -31,6 +32,14 @@ class Settings(BaseSettings):
 
     # CORS. In .env this must be JSON: ALLOWED_ORIGINS=["http://localhost:5173"]
     allowed_origins: list[str] = ["http://localhost:5173"]
+
+    @field_validator("hf_token", mode="before")
+    @classmethod
+    def _blank_token_is_none(cls, value: object) -> object:
+        """`HF_TOKEN=` in .env arrives as "", which the Hub would treat as a token."""
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
     @property
     def max_upload_bytes(self) -> int:

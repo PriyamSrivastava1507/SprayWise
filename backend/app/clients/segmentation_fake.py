@@ -1,3 +1,5 @@
+from typing import Optional
+
 import numpy as np
 
 from app.engine.constants import CROP, SOIL, WEED
@@ -7,7 +9,9 @@ from app.engine.vegetation import vegetation_mask
 class FakeSegmentationClient:
     """Stand-in segmentation client for local development and UI testing."""
 
+    backend: str = "fake"
     model_id: str = "fake-demo-model"
+    detail: Optional[str] = None
 
     def is_ready(self) -> bool:
         return True

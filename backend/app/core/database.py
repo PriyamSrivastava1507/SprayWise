@@ -6,9 +6,10 @@ from importlib import import_module
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import DateTime, create_engine, event
 from sqlalchemy.engine import Engine, make_url
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from sqlalchemy.types import TypeDecorator
 
 from app.core.config import settings
 
@@ -38,6 +39,33 @@ def _enable_sqlite_foreign_keys(dbapi_connection: Any, _record: Any) -> None:
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+class UTCDateTime(TypeDecorator[datetime]):
+    """
+    Timezone-aware UTC datetimes.
+
+    SQLite does not store tzinfo, so a plain DateTime(timezone=True) comes back
+    naive and the API would emit timestamps without a "Z". This type stores UTC
+    and always returns aware UTC values, on every database.
+    """
+
+    impl = DateTime(timezone=True)
+    cache_ok = True
+
+    def process_bind_param(self, value: datetime | None, dialect: Any) -> datetime | None:
+        if value is None:
+            return None
+        if value.tzinfo is None:  # treat naive input as UTC
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
+    def process_result_value(self, value: datetime | None, dialect: Any) -> datetime | None:
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
 
 
 def init_db() -> None:
