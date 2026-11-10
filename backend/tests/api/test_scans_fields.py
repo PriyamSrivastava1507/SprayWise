@@ -20,10 +20,10 @@ def test_scan_list_detail_delete(client):
     detail = client.get(f"{API}/scans/{ids[0]}")
     assert detail.status_code == 200 and detail.json()["id"] == ids[0]
 
-    assert len(media_files(client)) == 6
+    assert len(media_files(client)) == 9  # original + overlay + mask, per scan
     assert client.delete(f"{API}/scans/{ids[0]}").status_code == 204
     assert client.get(f"{API}/scans/{ids[0]}").status_code == 404
-    assert len(media_files(client)) == 4  # that scan's files are gone
+    assert len(media_files(client)) == 6  # that scan's files are gone
     assert client.get(f"{API}/scans").json()["total"] == 2
 
 
@@ -54,7 +54,7 @@ def test_scan_not_found(client):
 
 def test_delete_compare_scan_removes_both_overlays(client):
     scan_id = post(client, {"mode": "compare"}).json()["id"]
-    assert len(media_files(client)) == 3
+    assert len(media_files(client)) == 5
     client.delete(f"{API}/scans/{scan_id}")
     assert media_files(client) == []
 

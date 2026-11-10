@@ -40,6 +40,7 @@ class ScanResult(Base):
     pressure: Mapped[str | None]  # Low | Medium | High
 
     overlay_key: Mapped[str | None]
+    mask_key: Mapped[str | None]  # PNG label mask: 0 soil, 1 crop, 2 weed
     grid: Mapped[list[list[float]] | None] = mapped_column(JSON)  # densities: 0..1
     spray_cells: Mapped[list[list[int]] | None] = mapped_column(JSON)  # [row, col]
 

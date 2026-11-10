@@ -191,15 +191,17 @@ class AnalysisService:
         model_id = self.segmenter.model_id if is_ml else None
         compare = params.mode == Mode.COMPARE.value
 
+        started = time.perf_counter()
+
         def not_ok(status: ResultStatus, detail: Optional[str]) -> ScanResult:
             return ScanResult(
                 method=method.value,
                 status=status.value,
                 status_detail=detail,
                 model_id=model_id,
+                processing_ms=int((time.perf_counter() - started) * 1000),
             )
 
-        started = time.perf_counter()
         status_detail: Optional[str] = None
         mask: Optional[np.ndarray] = None
 
@@ -247,6 +249,8 @@ class AnalysisService:
             render_overlay(rgb, mask),
         )
         saved_keys.append(overlay_key)
+        mask_key = self.storage.save(f"{base_key}/{method.value}_mask.png", _encode_mask(mask))
+        saved_keys.append(mask_key)
 
         return ScanResult(
             method=method.value,
@@ -258,6 +262,7 @@ class AnalysisService:
             weed_pct=grid.weed_pct,
             pressure=pressure,
             overlay_key=overlay_key,
+            mask_key=mask_key,
             grid=grid.density,
             spray_cells=grid.spray_cells,
             blanket_cost=savings["blanket_cost"],
@@ -292,3 +297,10 @@ class AnalysisService:
 
 class _InvalidModelOutput(Exception):
     pass
+
+
+def _encode_mask(mask: np.ndarray) -> bytes:
+    """Greyscale PNG with the raw class ids (0, 1, 2). Lossless, a few KB."""
+    buffer = io.BytesIO()
+    Image.fromarray(mask.astype(np.uint8), mode="L").save(buffer, format="PNG", optimize=True)
+    return buffer.getvalue()

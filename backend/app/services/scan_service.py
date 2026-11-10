@@ -37,7 +37,9 @@ class ScanService:
         scan = self.scans.get(scan_id)
         if scan is None:
             raise NotFoundError(f"Scan {scan_id} does not exist.")
-        keys = [scan.original_key] + [r.overlay_key for r in scan.results if r.overlay_key]
+        keys = [scan.original_key]
+        for result in scan.results:
+            keys += [k for k in (result.overlay_key, result.mask_key) if k]
         self.scans.delete(scan)  # database first: a leftover file is harmless, a dangling row is not
         for key in keys:
             try:

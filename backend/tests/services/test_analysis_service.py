@@ -52,7 +52,7 @@ def test_classical_success(db, storage, tmp_path):
     assert len(result.grid) == 8 and len(result.grid[0]) == 8
     assert result.savings.saved_pct is not None
     assert result.overlay_url.startswith("/media/")
-    assert len(files_under(tmp_path)) == 2  # original + one overlay
+    assert len(files_under(tmp_path)) == 3  # original + overlay + mask
 
 
 def test_no_rows_is_a_result_not_an_error(db, storage):
