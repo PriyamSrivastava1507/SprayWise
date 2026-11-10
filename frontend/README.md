@@ -36,6 +36,23 @@ Indian rupees). The file is public, so never put secrets in it.
 | `#/scans/:id` | One stored scan |
 | `#/evaluation` | Classical vs ML scores on the labelled test photos |
 
+## Interactive tools
+
+- **Map:** switch the crop, weed and spray-zone layers; zoom with + / − / Fit,
+  Ctrl (or ⌘) + scroll, double-click or a two-finger pinch; drag to move;
+  from the keyboard, focus the map and use + − 0 and the arrow keys. Hovering
+  any map (and the two zone maps below it) shows the zone's row, column,
+  weed share and whether it is sprayed.
+- **Adjust and recalculate:** on a result, move the spray threshold or the zone
+  grid, or change area, dose or price, and everything updates while you move
+  the controls. Previews come from `POST /scans/{id}/recalculate?save=false`,
+  so the numbers are the server's. Downloads are disabled until you
+  **Save to scan**; **Reset** goes back to the saved settings.
+- **Swipe comparison:** on Compare (and on a Both scan's page), drag the
+  divider to see classical on the left and ML on the right over the same
+  photo, each with its own spray zones. It needs a successful result from both
+  methods; otherwise Side by side is shown.
+
 ## Structure
 
 ```

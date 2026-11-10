@@ -6,6 +6,7 @@ import { ErrorState } from '../../components/states.js';
 import { toast } from '../../components/toast.js';
 import { ScanView } from '../analyze/scan-results.js';
 import { SideBySide } from '../compare/compare.page.js';
+import { SwipeView } from '../compare/swipe-view.js';
 
 export async function mount(root, { id }) {
   const ctrl = new AbortController();
@@ -38,14 +39,27 @@ export async function mount(root, { id }) {
     } catch (err) {
       toast(err.message, { tone: 'error' });
       idle();
+
+  const view = ScanView(scan);
+  const [classical, ml] = ['classical', 'ml'].map((m) => scan.results.find((r) => r.method === m));
+  const swipe = classical && ml && [classical, ml].every((r) => r.status === 'ok' && r.mask_url)
+    ? h('section', { class: 'panel swipe-panel' }, h('h2', { class: 'panel-title' }, 'Swipe between methods'), SwipeView(scan, classical, ml))
+    : null;
     }
   }
   idle();
 
+  const view = ScanView(scan);
+  const [classical, ml] = ['classical', 'ml'].map((m) => scan.results.find((r) => r.method === m));
+  const swipe = classical && ml && [classical, ml].every((r) => r.status === 'ok' && r.mask_url)
+    ? h('section', { class: 'panel swipe-panel' }, h('h2', { class: 'panel-title' }, 'Swipe between methods'), SwipeView(scan, classical, ml))
+    : null;
+
   root.replaceChildren(...[
     h('div', { class: 'detail-bar' }, back, actions),
-    ScanView(scan),
+    view,
+    swipe,
     scan.results.length > 1 ? SideBySide(scan) : null,
   ].filter(Boolean));
-  return () => ctrl.abort();
+  return () => { ctrl.abort(); view.dispose(); };
 }

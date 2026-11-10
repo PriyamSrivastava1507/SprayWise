@@ -1,49 +1,40 @@
 // The prescription map: the photo with crop, weed and spray-zone layers that
-// can be switched on and off. Crop and weeds come from the result's mask
-// (pixel value = class), so the layers are exact. If the mask cannot be read,
-// the finished overlay image is shown instead, without toggles.
+// can be switched on and off, zoom and pan, and a tooltip for the zone under
+// the pointer. Crop and weeds come from the result's mask (pixel value =
+// class), so the layers are exact. If the mask cannot be read, the finished
+// overlay picture is shown instead, without the crop/weed switches.
+//
+// The returned element has update(scan, result): used while recalculating,
+// it redraws the zones without reloading images or losing the zoom.
 import { h, loadImage } from '../../utils/dom.js';
 import { mediaUrl } from '../../services/api.js';
+import { drawZones, loadLayers, paintClasses, zoneAt } from './map-paint.js';
+import { ZoneTooltip } from './zone-tooltip.js';
+import { ZoomStage } from './zoom-stage.js';
 
-const CROP = [34, 197, 94];
-const WEED = [239, 68, 68];
-const ALPHA = 0.55; // the same blend the backend uses for overlay_url
-const SPRAY = '#E2A019';
+export { drawZones };
 
-/** Draw the zone grid and outline the zones to spray. */
-export function drawZones(ctx, width, height, rows, cols, sprayCells, { fill = 0.16, lines = 'rgba(255,255,255,.2)' } = {}) {
-  const spray = new Set(sprayCells.map(([r, c]) => r + ',' + c));
-  const cw = width / cols, ch = height / rows;
-  const lw = Math.max(1.5, width / 380);
-  ctx.save();
-  ctx.fillStyle = `rgba(226,160,25,${fill})`;
-  for (const key of spray) {
-    const [r, c] = key.split(',').map(Number);
-    ctx.fillRect(c * cw, r * ch, cw, ch);
-  }
-  ctx.strokeStyle = lines;
-  ctx.lineWidth = Math.max(1, width / 900);
-  ctx.beginPath();
-  for (let c = 1; c < cols; c++) { ctx.moveTo(c * cw, 0); ctx.lineTo(c * cw, height); }
-  for (let r = 1; r < rows; r++) { ctx.moveTo(0, r * ch); ctx.lineTo(width, r * ch); }
-  ctx.stroke();
-  ctx.strokeStyle = SPRAY;
-  ctx.lineWidth = lw;
-  for (const key of spray) {
-    const [r, c] = key.split(',').map(Number);
-    ctx.strokeRect(c * cw + lw / 2, r * ch + lw / 2, cw - lw, ch - lw);
-  }
-  ctx.restore();
-}
-
-/**
- * @param {import('../../services/endpoints.js').Scan} scan
- * @param {import('../../services/endpoints.js').ScanResult} result
- */
 export function LayerViewer(scan, result, { zones = true, label = 'Field photo with crop, weed and spray-zone layers' } = {}) {
-  const canvas = h('canvas', { width: scan.width, height: scan.height, role: 'img', 'aria-label': label });
-  const stage = h('div', { class: 'map-stage is-loading' }, canvas);
+  const W = scan.width, H = scan.height;
+  const canvas = h('canvas', { width: W, height: H, 'aria-hidden': 'true' });
+  const hover = h('canvas', { class: 'hover-layer', width: W, height: H, 'aria-hidden': 'true' });
   const layers = { crop: true, weed: true, zones };
+  let current = { scan, result };
+  let base = null, masks = null, overlayImg = null, lastZone = null;
+
+  const shell = h('div', { class: 'map-stage is-loading' });
+  const tooltip = ZoneTooltip(shell);
+  const zoom = ZoomStage(h('div', { class: 'map-content' }, canvas, hover), {
+    label,
+    onHover: (cx, cy, px, py) => {
+      const k = W / zoom.el.clientWidth;
+      const zone = zoneAt(current.scan, current.result, cx * k, cy * k, W, H);
+      tooltip.show(zone, px, py, current.scan.params.cell_threshold);
+      highlight(zone);
+    },
+    onLeave: () => { tooltip.hide(); highlight(null); },
+  });
+  shell.append(zoom.el);
 
   const toggles = h('div', { class: 'layers', role: 'group', 'aria-label': 'Map layers' },
     ...[['crop', 'Crop'], ['weed', 'Weeds'], ['zones', 'Spray zones']].map(([key, text]) =>
@@ -56,55 +47,47 @@ export function LayerViewer(scan, result, { zones = true, label = 'Field photo w
         },
       }, h('i', { 'aria-hidden': 'true' }), text)));
 
-  let base = null, classes = null;
   const ctx = canvas.getContext('2d');
+  const hctx = hover.getContext('2d');
 
   function paint() {
-    if (!base) return;
-    const img = new ImageData(new Uint8ClampedArray(base.data), base.width, base.height);
-    const d = img.data;
-    if (layers.crop || layers.weed) {
-      for (let p = 0, i = 0; p < classes.length; p++, i += 4) {
-        const cls = classes[p];
-        const color = cls === 1 && layers.crop ? CROP : cls === 2 && layers.weed ? WEED : null;
-        if (!color) continue;
-        d[i] += (color[0] - d[i]) * ALPHA;
-        d[i + 1] += (color[1] - d[i + 1]) * ALPHA;
-        d[i + 2] += (color[2] - d[i + 2]) * ALPHA;
-      }
-    }
-    ctx.putImageData(img, 0, 0);
-    if (layers.zones) drawZones(ctx, canvas.width, canvas.height, scan.params.grid_rows, scan.params.grid_cols, result.spray_cells);
+    const { scan: s, result: r } = current;
+    if (base) ctx.putImageData(paintClasses(base, masks, layers), 0, 0);
+    else if (overlayImg) ctx.drawImage(overlayImg, 0, 0, W, H);
+    else return;
+    if (layers.zones) drawZones(ctx, W, H, s.params.grid_rows, s.params.grid_cols, r.spray_cells);
+  }
+
+  function highlight(zone) {
+    const key = zone ? zone.row + ',' + zone.col : null;
+    if (key === lastZone) return;
+    lastZone = key;
+    hctx.clearRect(0, 0, W, H);
+    if (!zone) return;
+    const { grid_rows: rows, grid_cols: cols } = current.scan.params;
+    const cw = W / cols, ch = H / rows, lw = Math.max(2, W / 300);
+    hctx.strokeStyle = '#fff';
+    hctx.lineWidth = lw;
+    hctx.strokeRect(zone.col * cw + lw / 2, zone.row * ch + lw / 2, cw - lw, ch - lw);
   }
 
   (async () => {
     try {
-      const [photo, mask] = await Promise.all([loadImage(mediaUrl(scan.original_url)), loadImage(mediaUrl(result.mask_url))]);
-      ctx.drawImage(photo, 0, 0, canvas.width, canvas.height);
-      base = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const m = document.createElement('canvas');
-      m.width = canvas.width; m.height = canvas.height;
-      const mctx = m.getContext('2d', { willReadFrequently: true });
-      mctx.imageSmoothingEnabled = false;
-      mctx.drawImage(mask, 0, 0, m.width, m.height);
-      const md = mctx.getImageData(0, 0, m.width, m.height).data;
-      classes = new Uint8Array(m.width * m.height);
-      for (let p = 0; p < classes.length; p++) classes[p] = md[p * 4];
-      stage.append(toggles);
-      paint();
+      ({ base, masks } = await loadLayers(scan, W, H, [result.mask_url]));
+      shell.append(toggles);
     } catch {
-      // Fallback: the finished overlay picture, plus the zone grid on top.
-      try {
-        const overlay = await loadImage(mediaUrl(result.overlay_url));
-        ctx.drawImage(overlay, 0, 0, canvas.width, canvas.height);
-        if (zones) drawZones(ctx, canvas.width, canvas.height, scan.params.grid_rows, scan.params.grid_cols, result.spray_cells);
-      } catch {
-        stage.append(h('p', { class: 'map-missing' }, 'The images for this scan could not be loaded.'));
-      }
-    } finally {
-      stage.classList.remove('is-loading');
+      try { overlayImg = await loadImage(mediaUrl(result.overlay_url)); } catch { /* handled below */ }
     }
+    if (!base && !overlayImg) shell.append(h('p', { class: 'map-missing' }, 'The images for this scan could not be loaded.'));
+    paint();
+    shell.classList.remove('is-loading');
   })();
 
-  return stage;
+  shell.update = (nextScan, nextResult) => {
+    current = { scan: nextScan, result: nextResult };
+    lastZone = null;
+    hctx.clearRect(0, 0, W, H);
+    paint();
+  };
+  return shell;
 }

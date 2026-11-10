@@ -26,6 +26,9 @@ export const scansApi = {
     request('/scans', { query: { field_id: fieldId, limit, offset }, signal }),
   get: (id, signal) => request('/scans/' + encodeURIComponent(id), { signal }),
   remove: (id) => request('/scans/' + encodeURIComponent(id), { method: 'DELETE' }),
+  /** Re-cut the saved masks with other settings. save=false only previews. */
+  recalculate: (id, settings, save, signal) => request('/scans/' + encodeURIComponent(id) + '/recalculate',
+    { method: 'POST', query: { save: save ? 'true' : 'false' }, json: settings, signal }),
   exportUrl: (id, kind, method) =>
     apiUrl('/scans/' + id + '/export/' + kind) + (method ? '?method=' + method : ''),
 };

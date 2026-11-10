@@ -16,6 +16,7 @@ from app.services.analysis_service import AnalysisService
 from app.services.evaluation_service import EvaluationService
 from app.services.export_service import ExportService
 from app.services.field_service import FieldService
+from app.services.recalculation_service import RecalculationService
 from app.services.scan_service import ScanService
 
 
@@ -85,3 +86,10 @@ def get_evaluation_service(settings: SettingsDep) -> EvaluationService:
 
 ExportServiceDep = Annotated[ExportService, Depends(get_export_service)]
 EvaluationServiceDep = Annotated[EvaluationService, Depends(get_evaluation_service)]
+
+
+def get_recalculation_service(db: DbDep, storage: StorageDep, settings: SettingsDep) -> RecalculationService:
+    return RecalculationService(ScanRepository(db), storage, settings)
+
+
+RecalculationServiceDep = Annotated[RecalculationService, Depends(get_recalculation_service)]

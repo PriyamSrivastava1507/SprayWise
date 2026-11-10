@@ -9,6 +9,7 @@ import { fmtMs, fmtPct, fmtPctWhole, fmtMoney, methodLabel, DASH } from '../../u
 import { AnalysisForm } from '../analyze/analysis-form.js';
 import { DemoTag, Downloads, PressureTag, ScanMeta, StatusPanel, StatusTag } from '../analyze/scan-results.js';
 import { LayerViewer } from '../analyze/layer-viewer.js';
+import { SwipeView } from './swipe-view.js';
 
 const ROWS = [
   ['Result', (r) => (r.status === 'ok' ? 'Analyzed' : { rows_not_detected: 'Rows not detected', model_unavailable: 'Model offline', failed: 'Failed' }[r.status])],
@@ -42,9 +43,32 @@ export function SideBySide(scan) {
 }
 
 export function CompareView(scan) {
+  const ok = scan.results.filter((r) => r.status === 'ok' && r.mask_url);
+  const canSwipe = ok.length === 2;
+  const body = h('div', {});
+  let view = canSwipe ? 'swipe' : 'columns';
+
+  const options = [['swipe', 'Swipe'], ['columns', 'Side by side']];
+  const buttons = options.map(([value, text]) => h('button', {
+    type: 'button', 'aria-pressed': String(view === value), disabled: value === 'swipe' && !canSwipe,
+    onclick: () => { view = value; render(); },
+  }, text));
+  const switcher = h('div', { class: 'view-switch' },
+    h('div', { class: 'seg seg-2', role: 'group', 'aria-label': 'Comparison view' }, buttons),
+    canSwipe ? null : h('span', { class: 'note-inline' }, 'Swipe needs a successful result from both methods.'));
+
+  function render() {
+    buttons.forEach((b, i) => b.setAttribute('aria-pressed', String(options[i][0] === view)));
+    const [classical, ml] = ['classical', 'ml'].map((m) => scan.results.find((r) => r.method === m));
+    body.replaceChildren(view === 'swipe'
+      ? SwipeView(scan, classical, ml)
+      : h('div', { class: 'compare-cols' }, scan.results.map((r) => MethodColumn(scan, r))));
+  }
+  render();
+
   return h('div', { class: 'compare-view' },
-    ScanMeta(scan, null),
-    h('div', { class: 'compare-cols' }, scan.results.map((r) => MethodColumn(scan, r))),
+    h('div', { class: 'compare-top' }, ScanMeta(scan, null), switcher),
+    body,
     SideBySide(scan));
 }
 
