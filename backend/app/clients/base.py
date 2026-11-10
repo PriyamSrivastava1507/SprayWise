@@ -1,9 +1,12 @@
-from typing import Protocol
+from typing import Optional, Protocol
+
 import numpy as np
 
 
 class SegmentationClient(Protocol):
+    backend: str  # "fake" | "unavailable" | "hf"
     model_id: str
+    detail: Optional[str]  # why the model is not ready, otherwise None
 
     def is_ready(self) -> bool:
         """Check whether the model is loaded and ready for inference."""
