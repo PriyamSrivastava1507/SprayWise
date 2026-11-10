@@ -3,15 +3,26 @@ name = "spraywise-backend"
 version = "0.1.0"
 requires-python = ">=3.10"
 dependencies = [
-    "datasets>=5.2.0",
+    "fastapi>=0.162.2",
+    "httpx>=0.28.1",
     "numpy>=2.2.6",
     "opencv-python-headless>=5.0.0.93",
     "pillow>=12.3.0",
+    "pydantic-settings>=2.15.0",
+    "python-multipart>=0.0.32",
+    "reportlab>=5.1.0",
     "scipy>=1.15.3",
+    "sqlalchemy>=2.0.57",
+    "uvicorn[standard]>=0.54.0",
 ]
 
 [dependency-groups]
 dev = [
+    "datasets>=5.2.0",  # only prepare_carrot.py uses it
     "pytest>=9.2.0",
     "scipy-stubs==1.15.3.0",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

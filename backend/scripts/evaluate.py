@@ -1,7 +1,8 @@
 """
 Score a segmentation method on labelled test images.
 
-Images and masks are paired by file name (``photo.jpg`` <-> ``photo.png``).
+Images and masks are paired by file name (``photo.jpg`` <-> ``photo.png``, or
+``001_image.png`` <-> ``001_mask.png``).
 Masks hold 0 soil, 1 crop, 2 weed and 255 ignore. The photo is downscaled to the
 working width exactly as the app does, and the mask with nearest-neighbour, so
 the numbers describe the real pipeline.
@@ -101,6 +102,31 @@ def _check_same_aspect(name: str, rgb: RGB, gt: Labels) -> None:
         raise ValueError(message)
 
 
+def find_mask(masks_dir: Path, image_path: Path) -> Path | None:
+    """
+    Find the ground-truth mask that belongs to an image.
+
+    Accepted names, in order (all ``.png``):
+        photo.jpg        -> photo.png
+        001_image.png    -> 001_mask.png   (the shared test-dataset convention)
+        photo.jpg        -> photo_mask.png
+    """
+    stem = image_path.stem
+    candidates = [stem]
+
+    if stem.endswith("_image"):
+        candidates.append(f"{stem[: -len('_image')]}_mask")
+
+    candidates.append(f"{stem}_mask")
+
+    for name in candidates:
+        path = masks_dir / f"{name}.png"
+        if path.exists():
+            return path
+
+    return None
+
+
 def evaluate(
     images_dir: Path,
     masks_dir: Path,
@@ -115,9 +141,9 @@ def evaluate(
     without_mask: list[str] = []
 
     for image_path in list_images(images_dir):
-        mask_path = masks_dir / f"{image_path.stem}.png"
+        mask_path = find_mask(masks_dir, image_path)
 
-        if not mask_path.exists():
+        if mask_path is None:
             without_mask.append(image_path.name)
             continue
 
