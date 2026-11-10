@@ -1,7 +1,7 @@
+# evaluation results (data/evaluation/*.json) are committed on purpose
 .env
 data/media/
 data/spraywise.db
-data/evaluation/*.json      # only if you don't want to commit results
 
 # local test data and debug output
 my_photos/

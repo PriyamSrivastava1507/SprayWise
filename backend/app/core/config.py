@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     # Persistence
     database_url: str = "sqlite:///./data/spraywise.db"
     storage_dir: str = "./data/media"
+    evaluation_dir: str = "./data/evaluation"  # classical.json, ml.json written by scripts/evaluate.py
 
     # ML segmentation client:
     #   fake        - artificial demo mask (development, frontend work)
