@@ -1,0 +1,4 @@
+SOIL = 0
+CROP = 1
+WEED = 2
+IGNORE = 255
