@@ -27,10 +27,13 @@ def test_success_shape(client):
     first = body["results"][0]
     assert set(first) == {
         "method", "status", "status_detail", "model_id", "vegetation_pct", "crop_pct",
-        "weed_pct", "pressure", "overlay_url", "grid", "spray_cells", "savings",
+        "weed_pct", "pressure", "overlay_url", "mask_url", "grid", "spray_cells", "savings",
         "processing_ms",
     }
-    assert set(first["savings"]) == {"blanket_cost", "spot_cost", "saved_litres", "saved_pct"}
+    assert set(first["savings"]) == {
+        "blanket_litres", "spot_litres", "saved_litres",
+        "blanket_cost", "spot_cost", "saved_cost", "saved_pct",
+    }
 
 
 def test_overlay_and_original_are_served(client):

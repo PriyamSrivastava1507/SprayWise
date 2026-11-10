@@ -12,7 +12,22 @@ from app.schemas.scan import (
 )
 
 
-def to_result_out(result: ScanResult, storage: StorageClient) -> ScanResultOut:
+def _savings(result: ScanResult, scan: Scan) -> Savings:
+    if result.saved_litres is None or result.blanket_cost is None or result.spot_cost is None:
+        return Savings()
+    blanket_litres = round(scan.area_ha * scan.dose_l_per_ha, 2)
+    return Savings(
+        blanket_litres=blanket_litres,
+        spot_litres=round(max(blanket_litres - result.saved_litres, 0.0), 2),
+        saved_litres=result.saved_litres,
+        blanket_cost=result.blanket_cost,
+        spot_cost=result.spot_cost,
+        saved_cost=round(result.blanket_cost - result.spot_cost, 2),
+        saved_pct=result.saved_pct,
+    )
+
+
+def to_result_out(result: ScanResult, scan: Scan, storage: StorageClient) -> ScanResultOut:
     return ScanResultOut(
         method=result.method,
         status=result.status,
@@ -23,14 +38,10 @@ def to_result_out(result: ScanResult, storage: StorageClient) -> ScanResultOut:
         weed_pct=result.weed_pct,
         pressure=result.pressure,
         overlay_url=storage.url(result.overlay_key) if result.overlay_key else None,
+        mask_url=storage.url(result.mask_key) if result.mask_key else None,
         grid=result.grid,
         spray_cells=result.spray_cells,
-        savings=Savings(
-            blanket_cost=result.blanket_cost,
-            spot_cost=result.spot_cost,
-            saved_litres=result.saved_litres,
-            saved_pct=result.saved_pct,
-        ),
+        savings=_savings(result, scan),
         processing_ms=result.processing_ms,
     )
 
@@ -52,5 +63,5 @@ def to_scan_detail(scan: Scan, storage: StorageClient) -> ScanDetail:
             grid_cols=scan.grid_cols,
             cell_threshold=scan.cell_threshold,
         ),
-        results=[to_result_out(result, storage) for result in scan.results],
+        results=[to_result_out(result, scan, storage) for result in scan.results],
     )

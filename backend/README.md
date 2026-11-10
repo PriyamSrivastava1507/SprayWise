@@ -48,7 +48,9 @@ Docker: `docker build -t spraywise-backend . && docker run -p 8000:8000 -v spray
 **Conventions the frontend can rely on**
 
 - Errors are always `{"error": {"code", "message"}}` (`invalid_image` 422, `file_too_large` 413, `not_found` 404, `model_unavailable` 503, `validation_error` 422, `conflict` 409, `internal_error` 500). Every response has an `X-Request-ID` header.
-- A scan has one result per method. Look at each result's `status`: `ok`, `rows_not_detected` (see `status_detail`), `model_unavailable`, `failed`. When it is not `ok`, the numbers are `null`; the `savings` object is always present.
+- A scan has one result per method. Look at each result's `status`: `ok`, `rows_not_detected` (see `status_detail`), `model_unavailable`, `failed`. When it is not `ok`, the numbers are `null`; the `savings` object is always present (`blanket_litres`, `spot_litres`, `saved_litres`, `blanket_cost`, `spot_cost`, `saved_cost`, `saved_pct`).
+- `overlay_url` is the finished picture (crop green, weeds red). `mask_url` is a greyscale PNG the same size as the photo whose pixel values are the classes (0 soil, 1 crop, 2 weed), for drawing layers separately. Both are `null` when the result is not `ok`.
+- `/health` also returns `pressure_thresholds` (`low_max`, `high_min`), the weed % limits behind Low / Medium / High.
 - Percentages are 0–100; grid densities and `cell_threshold` are fractions 0–1. Times are UTC ISO 8601 ending in `Z`.
 - `model_id == "fake-demo-model"` means the ML result is a placeholder: show it as a demo.
 - In `compare` mode, a failing method never hides the other: the response is 201 with both results.

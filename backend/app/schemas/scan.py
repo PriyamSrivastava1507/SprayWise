@@ -23,11 +23,15 @@ class ScanParams(BaseModel):
 
 
 class Savings(BaseModel):
-    """All four values are null when the result is not ok."""
+    """Spot spraying versus spraying the whole field. All values are null when
+    the result is not ok. Litres and money are rounded to 2 decimals."""
 
+    blanket_litres: Optional[float] = None  # area x dose
+    spot_litres: Optional[float] = None
+    saved_litres: Optional[float] = None
     blanket_cost: Optional[float] = None
     spot_cost: Optional[float] = None
-    saved_litres: Optional[float] = None
+    saved_cost: Optional[float] = None
     saved_pct: Optional[float] = None
 
 
@@ -48,7 +52,8 @@ class ScanResultOut(BaseModel):
     weed_pct: Optional[float] = None
     pressure: Optional[str] = None  # Low | Medium | High
 
-    overlay_url: Optional[str] = None
+    overlay_url: Optional[str] = None  # photo with crop green and weeds red
+    mask_url: Optional[str] = None  # greyscale PNG, pixel value = class (0 soil, 1 crop, 2 weed)
     grid: Optional[list[list[float]]] = None  # weed density per cell, 0..1
     spray_cells: Optional[list[list[int]]] = None  # [row, col] of cells to spray
 

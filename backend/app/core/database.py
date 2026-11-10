@@ -6,7 +6,7 @@ from importlib import import_module
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import DateTime, create_engine, event
+from sqlalchemy import DateTime, create_engine, event, inspect, text
 from sqlalchemy.engine import Engine, make_url
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 from sqlalchemy.types import TypeDecorator
@@ -82,3 +82,19 @@ def init_db() -> None:
             Path(db_path).parent.mkdir(parents=True, exist_ok=True)
 
     Base.metadata.create_all(engine)
+    _add_missing_columns()
+
+
+# Columns added after the first release. create_all does not alter existing
+# tables, so a database made by an older version gets them here.
+_ADDED_COLUMNS = {"scan_results": {"mask_key": "VARCHAR"}}
+
+
+def _add_missing_columns() -> None:
+    inspector = inspect(engine)
+    with engine.begin() as conn:
+        for table, columns in _ADDED_COLUMNS.items():
+            existing = {c["name"] for c in inspector.get_columns(table)}
+            for name, sql_type in columns.items():
+                if name not in existing:
+                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {sql_type}"))

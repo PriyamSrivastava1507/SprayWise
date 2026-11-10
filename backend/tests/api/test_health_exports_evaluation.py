@@ -106,3 +106,53 @@ def test_evaluation_reads_files(make_client, tmp_path):
     body = client.get(f"{API}/evaluation").json()
     assert body["classical"]["n_images"] == 20
     assert body["ml"] is None and body["ml_training_report"] is None
+
+
+# ---------------------------------------------------------------- additions
+
+def test_health_reports_pressure_thresholds(make_client):
+    body = make_client(pressure_low_max=4, pressure_high_min=12).get(f"{API}/health").json()
+    assert body["pressure_thresholds"] == {"low_max": 4.0, "high_min": 12.0}
+
+
+def test_mask_is_served_and_matches_photo(client):
+    from io import BytesIO
+
+    import numpy as np
+    from PIL import Image
+
+    scan = post(client, {"mode": "ml"}).json()
+    result = scan["results"][0]
+    mask = np.asarray(Image.open(BytesIO(client.get(result["mask_url"]).content)))
+    assert mask.shape == (scan["height"], scan["width"])
+    assert set(np.unique(mask)) <= {0, 1, 2}
+    weed_pct = (mask == 2).mean() * 100
+    assert abs(weed_pct - result["weed_pct"]) < 0.01
+
+
+def test_savings_has_litres_and_cost(client):
+    scan = post(client, {"mode": "ml", "area_ha": "2.5", "dose_l_per_ha": "2", "price_per_l": "450"}).json()
+    s = scan["results"][0]["savings"]
+    assert s["blanket_litres"] == 5.0
+    assert abs(s["spot_litres"] + s["saved_litres"] - 5.0) < 0.011
+    assert abs(s["saved_cost"] - (s["blanket_cost"] - s["spot_cost"])) < 0.011
+
+
+def test_not_ok_result_has_time_but_no_mask(make_client):
+    client = make_client("unavailable")
+    ml = next(r for r in post(client, {"mode": "compare"}).json()["results"] if r["method"] == "ml")
+    assert ml["mask_url"] is None and ml["processing_ms"] is not None
+    assert ml["savings"] == {k: None for k in ml["savings"]}
+
+
+def test_old_database_gets_mask_column(tmp_path, monkeypatch):
+    from sqlalchemy import create_engine, inspect, text
+
+    from app.core import database
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'old.db'}")
+    with engine.begin() as conn:
+        conn.execute(text("CREATE TABLE scan_results (id INTEGER PRIMARY KEY, scan_id INTEGER)"))
+    monkeypatch.setattr(database, "engine", engine)
+    database._add_missing_columns()
+    assert "mask_key" in {c["name"] for c in inspect(engine).get_columns("scan_results")}
