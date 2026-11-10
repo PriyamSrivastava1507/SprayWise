@@ -1,4 +1,3 @@
-# evaluation results (data/evaluation/*.json) are committed on purpose
 .env
 data/media/
 data/spraywise.db
