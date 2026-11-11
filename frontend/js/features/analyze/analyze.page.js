@@ -5,6 +5,7 @@ import { ErrorState, Loader } from '../../components/states.js';
 import { toast } from '../../components/toast.js';
 import { AnalysisForm } from './analysis-form.js';
 import { ScanView } from './scan-results.js';
+import { currentPhoto } from '../../utils/current-photo.js';
 
 function Intro() {
   return h('div', { class: 'intro' },
@@ -21,14 +22,19 @@ export function mount(root) {
   let view = null;
   const out = h('section', { class: 'workspace-main', 'aria-live': 'polite' }, Intro());
 
+  const show = (scan) => {
+    if (view) view.dispose();
+    view = ScanView(scan, { onRerun: (mode) => form.submitWithMode(mode) });
+    out.replaceChildren(view);
+  };
+
   const form = AnalysisForm({
-    onSubmit: async (fd) => {
+    onSubmit: async (fd, file) => {
       out.replaceChildren(Loader(fd.get('mode') === 'compare' ? 'Running both methods on the photo…' : 'Analyzing the photo…'));
       try {
         const scan = await analysisApi.analyze(fd, ctrl.signal);
-        if (view) view.dispose();
-        view = ScanView(scan, { onRerun: (mode) => form.submitWithMode(mode) });
-        out.replaceChildren(view);
+        currentPhoto.rememberScan(file, scan);
+        show(scan);
         toast('Scan ' + scan.id + ' saved to History.');
         if (matchMedia('(max-width: 860px)').matches) out.scrollIntoView({ behavior: 'smooth', block: 'start' });
       } catch (err) {
@@ -40,5 +46,8 @@ export function mount(root) {
   });
 
   root.replaceChildren(h('div', { class: 'workspace' }, h('aside', { class: 'workspace-side' }, form), out));
+  // Coming back from Compare: show the latest result for the same photo.
+  const previous = currentPhoto.scan();
+  if (previous && form.hasFile()) show(previous);
   return () => { ctrl.abort(); if (view) view.dispose(); };
 }
