@@ -470,3 +470,4 @@ tr.total td { font-weight: 650; border-bottom: 0; color: var(--canopy); }
 .method-card > header h2 { white-space: nowrap; }
 .cols-3 .zoom-controls .zoom-level, .cols-3 .zoom-controls .zoom-fit { display: none; }
 .cols-3 .layer { height: 26px; padding: 0 8px; font-size: 12px; }
+.carry-note { font-size: 13px; color: var(--muted); margin: 0 0 12px; }

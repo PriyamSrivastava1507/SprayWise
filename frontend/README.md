@@ -53,6 +53,15 @@ Indian rupees). The file is public, so never put secrets in it.
   photo, each with its own spray zones. It needs a successful result from both
   methods; otherwise Side by side is shown.
 
+## One photo across pages
+
+The photo you choose on Analyze or Compare stays selected when you switch
+between them (in memory; a page reload forgets it). On Compare it is compared
+straight away: if the latest Analyze scan of that photo already has two or
+more results it is shown as it is, otherwise the comparison runs with the
+remembered values (if area, dose and price are still empty, Compare waits).
+Choosing another photo on either page replaces it for both.
+
 ## Several ML models
 
 When the backend has more than one model (`ML_MODELS`), the app picks them up

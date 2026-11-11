@@ -5,6 +5,7 @@ import { CONFIG } from '../../config.js';
 import { h, s as svg, nextId } from '../../utils/dom.js';
 import { fieldsApi } from '../../services/endpoints.js';
 import { whenHealth } from '../../components/health.js';
+import { currentPhoto } from '../../utils/current-photo.js';
 import { currencySymbol } from '../../utils/formatters.js';
 
 const TYPES = ['image/jpeg', 'image/png'];
@@ -64,7 +65,7 @@ export function AnalysisForm({ fixedMode = null, chooser = false, title = 'New s
       h('div', { class: 'picker-name' }, h('b', { title: f.name }, f.name), dims),
       h('label', { for: ids.file, class: 'link-btn' }, 'Replace'));
   }
-  fileInput.addEventListener('change', () => { drawPicker(); clearError('file'); });
+  fileInput.addEventListener('change', () => { drawPicker(); clearError('file'); currentPhoto.set(fileInput.files[0]); });
   picker.addEventListener('dragover', (e) => { e.preventDefault(); picker.classList.add('over'); });
   picker.addEventListener('dragleave', () => picker.classList.remove('over'));
   picker.addEventListener('drop', (e) => {
@@ -75,6 +76,20 @@ export function AnalysisForm({ fixedMode = null, chooser = false, title = 'New s
       fileInput.dispatchEvent(new Event('change'));
     }
   });
+  /** Put a photo in the picker without the user choosing it again. */
+  function setFile(file) {
+    if (!file) return false;
+    try {
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      fileInput.files = dt.files;
+    } catch {
+      return false; // very old browsers cannot set files from script
+    }
+    drawPicker();
+    clearError('file');
+    return true;
+  }
   drawPicker();
 
   // ---- method -------------------------------------------------------------
@@ -226,16 +241,17 @@ export function AnalysisForm({ fixedMode = null, chooser = false, title = 'New s
   }
 
   let busy = false;
-  async function handleSubmit(ev) {
+  async function handleSubmit(ev, { quiet = false } = {}) {
     if (ev) ev.preventDefault();
-    if (busy) return;
+    if (busy) return false;
     errBox.textContent = '';
     const errors = validate();
-    for (const key of Object.keys(errors)) setError(key, errors[key]);
     if (Object.keys(errors).length) {
+      if (quiet) return false; // an automatic run never marks fields as wrong
+      for (const key of Object.keys(errors)) setError(key, errors[key]);
       const first = form.querySelector('[aria-invalid=true]') || (errors.file ? picker.querySelector('label') : null);
       if (first) first.focus();
-      return;
+      return false;
     }
 
     const fd = new FormData(form);
@@ -265,18 +281,25 @@ export function AnalysisForm({ fixedMode = null, chooser = false, title = 'New s
     submit.disabled = true;
     submit.textContent = 'Analyzing…';
     try {
-      await onSubmit(fd);
+      await onSubmit(fd, fileInput.files[0]);
     } finally {
       busy = false;
       submit.disabled = false;
       submit.textContent = submitLabel;
     }
+    return true;
   }
-  form.addEventListener('submit', handleSubmit);
+  form.addEventListener('submit', (ev) => handleSubmit(ev));
 
   /** Run again with another method (used by "Run ML on this photo"). */
   form.submitWithMode = (mode) => { setMode(mode); handleSubmit(); };
   /** Show a server-side validation message under the form. */
   form.showServerError = (message) => { errBox.textContent = message; };
+  /** Run now if everything is filled in; returns false (and changes nothing) otherwise. */
+  form.runIfReady = () => handleSubmit(null, { quiet: true });
+  /** Resolves once the model choices from /health are on the form. */
+  form.ready = whenHealth().then(() => undefined);
+  form.hasFile = () => fileInput.files.length > 0;
+  setFile(currentPhoto.get()); // the photo from the other page, if any
   return form;
 }

@@ -10,6 +10,7 @@ import { AnalysisForm } from '../analyze/analysis-form.js';
 import { DemoTag, Downloads, PressureTag, ScanMeta, StatusPanel, StatusTag } from '../analyze/scan-results.js';
 import { LayerViewer } from '../analyze/layer-viewer.js';
 import { SwipeView } from './swipe-view.js';
+import { currentPhoto } from '../../utils/current-photo.js';
 
 const ROWS = [
   ['Result', (r) => (r.status === 'ok' ? 'Analyzed' : { rows_not_detected: 'Rows not detected', model_unavailable: 'Model offline', failed: 'Failed' }[r.status])],
@@ -107,10 +108,11 @@ export function mount(root) {
     chooser: true,
     title: 'Compare on a photo',
     submitLabel: 'Run comparison',
-    onSubmit: async (fd) => {
+    onSubmit: async (fd, file) => {
       out.replaceChildren(Loader('Running the comparison on the photo…'));
       try {
         const scan = await analysisApi.analyze(fd, ctrl.signal);
+        currentPhoto.rememberScan(file, scan);
         out.replaceChildren(CompareView(scan));
         toast('Scan ' + scan.id + ' saved to History.');
       } catch (err) {
@@ -125,5 +127,26 @@ export function mount(root) {
     h('div', { class: 'page-head' }, h('h1', {}, 'Compare methods'),
       h('p', {}, 'Classical finds crop rows by colour and geometry. Each ML model labels every pixel; models trained on different datasets can disagree.')),
     h('div', { class: 'compare-layout' }, h('aside', { class: 'workspace-side' }, form), out));
+  carryOver();
   return () => ctrl.abort();
+
+  // Coming from Analyze with a photo: compare it straight away.
+  async function carryOver() {
+    if (!form.hasFile()) return;
+    const previous = currentPhoto.scan();
+    if (previous && previous.results.length > 1) {
+      // That scan already has two or more results: show it, no new run.
+      out.replaceChildren(
+        h('p', { class: 'carry-note' }, 'Showing scan ' + previous.id + ' of this photo. Change the ticks and press Run comparison to compare something else.'),
+        CompareView(previous));
+      return;
+    }
+    await form.ready;
+    if (ctrl.signal.aborted) return;
+    const ran = await form.runIfReady();
+    if (!ran && !ctrl.signal.aborted) {
+      out.replaceChildren(EmptyState('Ready to compare this photo',
+        'The photo from Analyze is on the left. Fill in the field area, dose and price, then press Run comparison.'));
+    }
+  }
 }
