@@ -53,6 +53,21 @@ Indian rupees). The file is public, so never put secrets in it.
   photo, each with its own spray zones. It needs a successful result from both
   methods; otherwise Side by side is shown.
 
+## Several ML models
+
+When the backend has more than one model (`ML_MODELS`), the app picks them up
+from `/health`; nothing to configure here.
+
+- **Analyze:** with Method set to ML or Both, a **Model** list appears: each
+  model, or **All models** (each result gets its own tab). Offline models are
+  greyed out.
+- **Compare:** tick any two or more of Classical and the models. With more
+  than two results, Swipe lets you choose the left and right sides.
+- **History:** the trend can follow any one model; a row shows the result it
+  summarises, and "+1" when the scan has more.
+- **Evaluation:** one table per test set, one column per method or model;
+  models without results are listed as not evaluated yet.
+
 ## Structure
 
 ```

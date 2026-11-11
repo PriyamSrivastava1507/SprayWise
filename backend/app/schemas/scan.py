@@ -43,6 +43,8 @@ class ScanResultOut(BaseModel):
     """
 
     method: str  # classical | ml
+    model_key: Optional[str] = None  # which ML model, e.g. "cwfid"; null for classical
+    model_label: Optional[str] = None  # its display name, e.g. "ML (CWFID)"
     status: str  # ok | rows_not_detected | model_unavailable | failed
     status_detail: Optional[str] = None  # e.g. "weak_periodicity"
     model_id: Optional[str] = None  # ml only; "fake-demo-model" means a demo result

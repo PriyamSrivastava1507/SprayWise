@@ -30,6 +30,24 @@ class AnalyzeParams(ScanSettings):
     mode: Literal["classical", "ml", "compare"] = "classical"
     field_id: Optional[int] = None
     field_name: Optional[str] = Field(None, min_length=1, max_length=120)
+    # ML models to run, by key (e.g. ["cwfid", "we3ds"]). Empty = the default model.
+    models: list[str] = Field(default_factory=list, max_length=8)
+
+    @field_validator("models", mode="before")
+    @classmethod
+    def _split_models(cls, value: object) -> object:
+        # Accept "cwfid,we3ds" (a form field) or a list; drop blanks and repeats.
+        if value is None:
+            return []
+        items = value.split(",") if isinstance(value, str) else value
+        if not isinstance(items, list):
+            return value
+        seen: list[str] = []
+        for item in items:
+            key = str(item).strip()
+            if key and key not in seen:
+                seen.append(key)
+        return seen
 
     @field_validator("field_id", "field_name", mode="before")
     @classmethod

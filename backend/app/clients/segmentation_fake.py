@@ -13,6 +13,11 @@ class FakeSegmentationClient:
     model_id: str = "fake-demo-model"
     detail: Optional[str] = None
 
+    def __init__(self, weed_side: str = "right") -> None:
+        # Which half of the vegetation is called weed. Two fake models with
+        # different sides make model comparisons visible during UI work.
+        self.weed_side = weed_side
+
     def is_ready(self) -> bool:
         return True
 
@@ -22,9 +27,9 @@ class FakeSegmentationClient:
         out[veg] = CROP
 
         half = veg.shape[1] // 2
-        # Mark right half of detected vegetation as weed
-        right_veg = veg[:, half:]
-        out[:, half:][right_veg] = WEED
+        # Mark one half of detected vegetation as weed
+        side = slice(half, None) if self.weed_side == "right" else slice(0, half)
+        out[:, side][veg[:, side]] = WEED
 
         return out
 

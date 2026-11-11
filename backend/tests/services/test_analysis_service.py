@@ -29,11 +29,13 @@ def storage(tmp_path):
 
 
 def make_service(db, storage, segmenter=None):
+    from app.clients.registry import ModelRegistry
+
     return AnalysisService(
         scans=ScanRepository(db),
         fields=FieldRepository(db),
         storage=storage,
-        segmenter=segmenter or FakeSegmentationClient(),
+        models=ModelRegistry.single(segmenter or FakeSegmentationClient()),
         settings=Settings(),
     )
 

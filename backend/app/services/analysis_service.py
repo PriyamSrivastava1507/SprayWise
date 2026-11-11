@@ -18,11 +18,13 @@ import numpy as np
 from PIL import Image, ImageOps
 from sqlalchemy.exc import IntegrityError
 
-from app.clients.base import SegmentationClient, StorageClient
+from app.clients.base import StorageClient
+from app.clients.registry import LoadedModel, ModelRegistry, UnknownModelKey
 from app.core.config import Settings
 from app.core.enums import Method, Mode, ResultStatus
 from app.core.exceptions import (
     InvalidImageError,
+    InvalidParameterError,
     ModelUnavailableError,
     NotFoundError,
 )
@@ -58,13 +60,13 @@ class AnalysisService:
         scans: ScanRepository,
         fields: FieldRepository,
         storage: StorageClient,
-        segmenter: SegmentationClient,
+        models: ModelRegistry,
         settings: Settings,
     ):
         self.scans = scans
         self.fields = fields
         self.storage = storage
-        self.segmenter = segmenter
+        self.models = models
         self.settings = settings
 
     # ------------------------------------------------------------------ public
@@ -74,10 +76,12 @@ class AnalysisService:
         rgb = self._decode(data)
         height, width = rgb.shape[:2]
         mode = Mode(params.mode)
+        runs = self._runs_for(mode, params.models)
 
-        # Fail fast, before touching the disk: ML-only with no model.
-        if mode is Mode.ML and not self.segmenter.is_ready():
-            raise ModelUnavailableError(self._unavailable_message())
+        # Fail fast, before touching the disk: ML-only and no chosen model works.
+        if mode is Mode.ML and not any(m is not None and m.client.is_ready() for _, m in runs):
+            raise ModelUnavailableError(self._unavailable_message([m for _, m in runs]))
+        partial = len(runs) > 1  # one run failing must not hide the others
 
         field = self._resolve_field(params)
 
@@ -88,8 +92,8 @@ class AnalysisService:
             saved_keys.append(original_key)
 
             results = [
-                self._run_method(method, rgb, params, base_key, saved_keys)
-                for method in self._methods_for(mode)
+                self._run_method(method, model, rgb, params, base_key, saved_keys, partial)
+                for method, model in runs
             ]
 
             scan = Scan(
@@ -115,10 +119,10 @@ class AnalysisService:
             "analysis done scan_id=%s mode=%s statuses=%s total_ms=%d",
             scan.id,
             mode.value,
-            {r.method: r.status for r in results},
+            {_variant(r.method, r.model_key): r.status for r in results},
             (time.perf_counter() - started) * 1000,
         )
-        return to_scan_detail(scan, self.storage)
+        return to_scan_detail(scan, self.storage, self.models.labels())
 
     # ------------------------------------------------------------------ decode
 
@@ -167,35 +171,53 @@ class AnalysisService:
 
     # ----------------------------------------------------------------- methods
 
-    @staticmethod
-    def _methods_for(mode: Mode) -> list[Method]:
+    def _runs_for(self, mode: Mode, keys: list[str]) -> list[tuple[Method, Optional[LoadedModel]]]:
+        """What to run: classical, and/or the chosen ML models (default if none)."""
+        try:
+            models = [self.models.get(k) for k in keys] or [self.models.default]
+        except UnknownModelKey as exc:
+            raise InvalidParameterError(
+                f"models: unknown model '{exc.args[0]}'. Available: {', '.join(self.models.keys)}."
+            ) from None
         if mode is Mode.CLASSICAL:
-            return [Method.CLASSICAL]
+            return [(Method.CLASSICAL, None)]
+        ml_runs: list[tuple[Method, Optional[LoadedModel]]] = [(Method.ML, m) for m in models]
         if mode is Mode.ML:
-            return [Method.ML]
-        return [Method.CLASSICAL, Method.ML]
+            return ml_runs
+        return [(Method.CLASSICAL, None), *ml_runs]
 
-    def _unavailable_message(self) -> str:
-        detail = self.segmenter.detail
-        return "The ML model is not available." + (f" Reason: {detail}" if detail else "")
+    @staticmethod
+    def _unavailable_message(models: list[Optional[LoadedModel]]) -> str:
+        parts = []
+        for m in models:
+            if m is None:
+                continue
+            parts.append(m.label + (f" ({m.client.detail})" if m.client.detail else ""))
+        lead = "The ML model is not available: " if len(parts) == 1 else "None of the chosen ML models is available: "
+        return lead + "; ".join(parts)
 
     def _run_method(
         self,
         method: Method,
+        model: Optional[LoadedModel],
         rgb: np.ndarray,
         params: AnalyzeParams,
         base_key: str,
         saved_keys: list[str],
+        partial: bool,
     ) -> ScanResult:
         is_ml = method is Method.ML
-        model_id = self.segmenter.model_id if is_ml else None
-        compare = params.mode == Mode.COMPARE.value
+        client = model.client if model else None
+        model_key = model.key if model else ""
+        model_id = client.model_id if client else None
+        variant = _variant(method.value, model_key)
 
         started = time.perf_counter()
 
         def not_ok(status: ResultStatus, detail: Optional[str]) -> ScanResult:
             return ScanResult(
                 method=method.value,
+                model_key=model_key,
                 status=status.value,
                 status_detail=detail,
                 model_id=model_id,
@@ -206,12 +228,12 @@ class AnalysisService:
         mask: Optional[np.ndarray] = None
 
         try:
-            if is_ml:
-                if not self.segmenter.is_ready():
-                    if not compare:
-                        raise ModelUnavailableError(self._unavailable_message())
-                    return not_ok(ResultStatus.MODEL_UNAVAILABLE, self.segmenter.detail)
-                mask = self._validated_ml_mask(self.segmenter.predict(rgb), rgb)
+            if client is not None:
+                if not client.is_ready():
+                    if not partial:
+                        raise ModelUnavailableError(self._unavailable_message([model]))
+                    return not_ok(ResultStatus.MODEL_UNAVAILABLE, client.detail)
+                mask = self._validated_ml_mask(client.predict(rgb), rgb)
             else:
                 mask, info = classical_segment_with_info(rgb)
                 if mask is None:
@@ -232,28 +254,29 @@ class AnalysisService:
             )
             processing_ms = int((time.perf_counter() - started) * 1000)
         except ModelUnavailableError as exc:
-            if is_ml and compare:
+            if is_ml and partial:
                 return not_ok(ResultStatus.MODEL_UNAVAILABLE, exc.message)
             raise
         except _InvalidModelOutput as exc:
             logger.error("ML model returned invalid output: %s", exc)
             return not_ok(ResultStatus.FAILED, "invalid_model_output")
         except Exception:
-            if is_ml and compare:
-                logger.exception("ML inference failed")
+            if is_ml and partial:
+                logger.exception("ML inference failed (%s)", model_key)
                 return not_ok(ResultStatus.FAILED, "inference_error")
             raise
 
         overlay_key = self.storage.save(
-            f"{base_key}/{method.value}_overlay.png",
+            f"{base_key}/{variant}_overlay.png",
             render_overlay(rgb, mask),
         )
         saved_keys.append(overlay_key)
-        mask_key = self.storage.save(f"{base_key}/{method.value}_mask.png", _encode_mask(mask))
+        mask_key = self.storage.save(f"{base_key}/{variant}_mask.png", _encode_mask(mask))
         saved_keys.append(mask_key)
 
         return ScanResult(
             method=method.value,
+            model_key=model_key,
             status=ResultStatus.OK.value,
             status_detail=None,
             model_id=model_id,
@@ -293,6 +316,11 @@ class AnalysisService:
                 self.storage.delete(key)
             except Exception:
                 logger.warning("could not delete %s during cleanup", key, exc_info=True)
+
+
+def _variant(method: str, model_key: str) -> str:
+    # 'classical', or 'ml-<key>': used in file names and logs.
+    return f"{method}-{model_key}" if model_key else method
 
 
 class _InvalidModelOutput(Exception):

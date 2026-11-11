@@ -16,7 +16,8 @@ from pydantic import ValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.v1.router import api_router
-from app.clients.factory import build_segmentation_client, build_storage_client
+from app.clients.factory import build_storage_client
+from app.clients.registry import ModelRegistry
 from app.core.config import Settings, settings as default_settings
 from app.core.database import init_db
 from app.core.exceptions import AppError
@@ -84,12 +85,11 @@ def create_app(
             init_db()
         app.state.settings = cfg
         app.state.storage = build_storage_client(cfg)
-        app.state.segmenter = build_segmentation_client(cfg)
+        app.state.models = ModelRegistry.from_settings(cfg)
         logger.info(
-            "segmentation backend=%s model=%s ready=%s",
-            app.state.segmenter.backend,
-            app.state.segmenter.model_id,
-            app.state.segmenter.is_ready(),
+            "ML models: %s (default %s)",
+            ", ".join(f"{m.key}={'ready' if m.client.is_ready() else 'offline'}" for m in app.state.models),
+            app.state.models.default_key,
         )
         yield
 

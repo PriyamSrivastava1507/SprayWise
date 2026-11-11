@@ -195,26 +195,56 @@ def evaluate(
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Evaluate the classical engine on labelled images.",
+        description=(
+            "Score the classical engine, or one ML model (--model), on labelled images. "
+            "Save as data/evaluation/<variant>__<test-set>.json, for example "
+            "classical__cwfid-test.json or ml-we3ds__cwfid-test.json."
+        ),
     )
     parser.add_argument("images", type=Path, help="folder with the test photos")
     parser.add_argument("masks", type=Path, help="folder with the masks (.png)")
     parser.add_argument("--dataset", default="", help="name of the test set")
     parser.add_argument("--out", type=Path, help="write the JSON result here")
     parser.add_argument("--width", type=int, default=DEFAULT_WIDTH)
+    parser.add_argument(
+        "--model",
+        help="score this ML model (a key from ML_MODELS in .env) instead of the classical engine",
+    )
     args = parser.parse_args(argv)
 
     for folder in (args.images, args.masks):
         if not folder.is_dir():
             parser.error(f"not a folder: {folder}")
 
+    predictor: Predictor = classical_segment
+    model_fields: dict[str, object] = {"method": "classical"}
+    if args.model:
+        from app.clients.registry import ModelRegistry, UnknownModelKey
+        from app.core.config import Settings
+
+        registry = ModelRegistry.from_settings(Settings())
+        try:
+            chosen = registry.get(args.model)
+        except UnknownModelKey:
+            parser.error(f"unknown model '{args.model}'. Available: {', '.join(registry.keys)}")
+        if not chosen.client.is_ready():
+            print(f"error: model '{args.model}' is not available: {chosen.client.detail}", file=sys.stderr)
+            return 1
+        predictor = chosen.client.predict
+        model_fields = {
+            "method": "ml",
+            "model_key": chosen.key,
+            "model_label": chosen.label,
+            "model_id": chosen.client.model_id,
+        }
+
     try:
-        result = evaluate(args.images, args.masks, classical_segment, args.width)
+        result = evaluate(args.images, args.masks, predictor, args.width)
     except ValueError as error:  # bad masks, no pairs: show the message only
         print(f"error: {error}", file=sys.stderr)
         return 1
 
-    payload: dict[str, object] = {**result, "method": "classical"}
+    payload: dict[str, object] = {**result, **model_fields}
     if args.dataset:
         payload["dataset"] = args.dataset
 

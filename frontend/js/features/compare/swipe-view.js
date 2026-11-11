@@ -3,7 +3,7 @@
 // two methods disagree. Spray zones of each method are drawn on its own side.
 import { h } from '../../utils/dom.js';
 import { drawZones, loadLayers, paintClasses } from '../analyze/map-paint.js';
-import { methodLabel } from '../../utils/formatters.js';
+import { resultLabel } from '../../utils/formatters.js';
 
 export function SwipeView(scan, left, right) {
   const W = scan.width, H = scan.height;
@@ -11,13 +11,13 @@ export function SwipeView(scan, left, right) {
   const divider = h('div', { class: 'swipe-divider', 'aria-hidden': 'true' }, h('span', { class: 'swipe-grip' }));
   const range = h('input', {
     type: 'range', min: '0', max: '100', step: '1', value: '50', class: 'swipe-range',
-    'aria-label': 'Divider position: ' + methodLabel(left.method) + ' on the left, ' + methodLabel(right.method) + ' on the right',
+    'aria-label': 'Divider position: ' + resultLabel(left) + ' on the left, ' + resultLabel(right) + ' on the right',
   });
   const layers = { crop: true, weed: true, zones: true };
   const stage = h('div', { class: 'swipe-stage is-loading' },
     canvas, divider,
-    h('span', { class: 'swipe-label swipe-left' }, methodLabel(left.method)),
-    h('span', { class: 'swipe-label swipe-right' }, methodLabel(right.method)),
+    h('span', { class: 'swipe-label swipe-left' }, resultLabel(left)),
+    h('span', { class: 'swipe-label swipe-right' }, resultLabel(right)),
     range);
 
   const toggles = h('div', { class: 'layers swipe-layers', role: 'group', 'aria-label': 'Layers' },
@@ -33,7 +33,7 @@ export function SwipeView(scan, left, right) {
   function paint() {
     const split = Math.round(W * Number(range.value) / 100);
     divider.style.left = range.value + '%';
-    range.setAttribute('aria-valuetext', range.value + '% ' + methodLabel(left.method));
+    range.setAttribute('aria-valuetext', range.value + '% ' + resultLabel(left));
     if (!data) return;
     ctx.putImageData(paintClasses(data.base, data.masks, layers, (x) => (x < split ? 0 : 1)), 0, 0);
     if (layers.zones) {
@@ -59,8 +59,8 @@ export function SwipeView(scan, left, right) {
   paint();
 
   const diff = left.weed_pct != null && right.weed_pct != null
-    ? 'Weed cover: ' + methodLabel(left.method) + ' ' + left.weed_pct.toFixed(1) + '%, ' +
-      methodLabel(right.method) + ' ' + right.weed_pct.toFixed(1) + '%. Zones to spray: ' +
+    ? 'Weed cover: ' + resultLabel(left) + ' ' + left.weed_pct.toFixed(1) + '%, ' +
+      resultLabel(right) + ' ' + right.weed_pct.toFixed(1) + '%. Zones to spray: ' +
       left.spray_cells.length + ' and ' + right.spray_cells.length + '.'
     : '';
   return h('div', { class: 'swipe' }, stage, h('p', { class: 'note' }, 'Drag the divider or click the photo. ' + diff));

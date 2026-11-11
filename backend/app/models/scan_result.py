@@ -13,7 +13,8 @@ if TYPE_CHECKING:
 
 class ScanResult(Base):
     """
-    One row per method run, so a Compare scan has two.
+    One row per method run, so a Compare scan has two (or more: one per ML
+    model). `model_key` says which ML model; it is "" for classical.
 
     When status is not "ok" the statistics stay NULL, so the API can return
     every result in the same shape and the frontend only inspects `status`.
@@ -21,7 +22,7 @@ class ScanResult(Base):
 
     __tablename__ = "scan_results"
     __table_args__ = (
-        UniqueConstraint("scan_id", "method", name="uq_scan_method"),  # pyright: ignore[reportCallIssue]
+        UniqueConstraint("scan_id", "method", "model_key", name="uq_scan_method_model"),  # pyright: ignore[reportCallIssue]
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -32,7 +33,8 @@ class ScanResult(Base):
     method: Mapped[str]  # Method value: classical | ml
     status: Mapped[str]  # ResultStatus value
     status_detail: Mapped[str | None]  # why it was not ok, e.g. "weak_periodicity"
-    model_id: Mapped[str | None]
+    model_key: Mapped[str] = mapped_column(default="", server_default="")  # e.g. "cwfid"; "" for classical
+    model_id: Mapped[str | None]  # what the model client reports (Hub ID or folder)
 
     vegetation_pct: Mapped[float | None]  # percentages: 0..100
     crop_pct: Mapped[float | None]

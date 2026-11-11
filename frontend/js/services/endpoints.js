@@ -3,7 +3,8 @@ import { request, apiUrl } from './api.js';
 
 /**
  * @typedef {'ok'|'rows_not_detected'|'model_unavailable'|'failed'} ResultStatus
- * @typedef {{ method: 'classical'|'ml', status: ResultStatus, status_detail: ?string,
+ * @typedef {{ method: 'classical'|'ml', model_key: ?string, model_label: ?string,
+ *   status: ResultStatus, status_detail: ?string,
  *   model_id: ?string, vegetation_pct: ?number, crop_pct: ?number, weed_pct: ?number,
  *   pressure: ?('Low'|'Medium'|'High'), overlay_url: ?string, mask_url: ?string,
  *   grid: ?number[][], spray_cells: ?number[][], processing_ms: ?number,
@@ -29,16 +30,25 @@ export const scansApi = {
   /** Re-cut the saved masks with other settings. save=false only previews. */
   recalculate: (id, settings, save, signal) => request('/scans/' + encodeURIComponent(id) + '/recalculate',
     { method: 'POST', query: { save: save ? 'true' : 'false' }, json: settings, signal }),
-  exportUrl: (id, kind, method) =>
-    apiUrl('/scans/' + id + '/export/' + kind) + (method ? '?method=' + method : ''),
+  /** Download link for one result (its method and, for ML, its model). */
+  exportUrl: (id, kind, result) => {
+    const q = new URLSearchParams();
+    if (result) {
+      q.set('method', result.method);
+      if (result.model_key) q.set('model', result.model_key);
+    }
+    return apiUrl('/scans/' + id + '/export/' + kind) + (q.toString() ? '?' + q : '');
+  },
 };
 
 export const fieldsApi = {
   list: (signal) => request('/fields', { signal }),
   create: (name) => request('/fields', { method: 'POST', json: { name } }),
-  trend: (id, method, signal) => request('/fields/' + id + '/trend', { query: { method }, signal }),
+  trend: (id, method, model, signal) => request('/fields/' + id + '/trend', { query: { method, model }, signal }),
 };
 
 export const evaluationApi = { get: (signal) => request('/evaluation', { signal }) };
 
 export const healthApi = { get: (signal) => request('/health', { signal }) };
+
+export const modelsApi = { list: (signal) => request('/models', { signal }) };

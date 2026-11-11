@@ -1,6 +1,7 @@
 """Reading and deleting stored scans."""
 
 import logging
+from collections.abc import Mapping
 from typing import Optional
 
 from app.clients.base import StorageClient
@@ -14,14 +15,15 @@ logger = logging.getLogger(__name__)
 
 
 class ScanService:
-    def __init__(self, scans: ScanRepository, storage: StorageClient):
+    def __init__(self, scans: ScanRepository, storage: StorageClient, labels: Mapping[str, str] = {}):
         self.scans = scans
         self.storage = storage
+        self.labels = labels
 
     def list(self, field_id: Optional[int], limit: int, offset: int) -> Page[ScanDetail]:
         rows = self.scans.list(field_id, limit, offset)
         return Page[ScanDetail](
-            items=[to_scan_detail(scan, self.storage) for scan in rows],
+            items=[to_scan_detail(scan, self.storage, self.labels) for scan in rows],
             total=self.scans.count(field_id),
             limit=limit,
             offset=offset,
@@ -31,7 +33,7 @@ class ScanService:
         scan = self.scans.get(scan_id)
         if scan is None:
             raise NotFoundError(f"Scan {scan_id} does not exist.")
-        return to_scan_detail(scan, self.storage)
+        return to_scan_detail(scan, self.storage, self.labels)
 
     def delete(self, scan_id: int) -> None:
         scan = self.scans.get(scan_id)

@@ -31,4 +31,6 @@ class TrendPoint(BaseModel):
 class TrendResponse(BaseModel):
     field: FieldOut
     method: Literal["classical", "ml"]
+    model_key: Optional[str] = None  # which ML model, when method is "ml"
+    model_label: Optional[str] = None
     points: list[TrendPoint]  # oldest first, successful results only
