@@ -471,3 +471,13 @@ tr.total td { font-weight: 650; border-bottom: 0; color: var(--canopy); }
 .cols-3 .zoom-controls .zoom-level, .cols-3 .zoom-controls .zoom-fit { display: none; }
 .cols-3 .layer { height: 26px; padding: 0 8px; font-size: 12px; }
 .carry-note { font-size: 13px; color: var(--muted); margin: 0 0 12px; }
+
+/* ------------------------------------------------------------------ "What this means" */
+.explain { margin-top: 28px; background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius); padding: 18px 22px; }
+.explain-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.explain-head h3 { font-size: 15px; font-weight: 650; }
+.explain-body { max-width: 74ch; }
+.explain-body p { font-size: 15px; line-height: 1.6; color: var(--ink); }
+.explain-body p + p { margin-top: 10px; }
+.explain-body p:last-child { color: var(--muted); font-size: 14px; }
+.result.is-preview .explain { border-color: var(--spray); }

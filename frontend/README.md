@@ -53,6 +53,15 @@ Indian rupees). The file is public, so never put secrets in it.
   photo, each with its own spray zones. It needs a successful result from both
   methods; otherwise Side by side is shown.
 
+## What this means
+
+Under every successful result, a short plain-language explanation walks
+through its numbers: ground cover and weed pressure, how many zones are
+sprayed and why, how much of the weed area the sprayed zones hold, the
+herbicide and money saved, and the assumptions behind them (plus a note
+when the result comes from a demo model). It updates while you adjust and
+recalculate, and **Copy text** puts it on the clipboard for a report.
+
 ## One photo across pages
 
 The photo you choose on Analyze or Compare stays selected when you switch

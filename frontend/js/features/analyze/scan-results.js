@@ -12,6 +12,7 @@ import {
 import { LayerViewer } from './layer-viewer.js';
 import { HeatMap, SprayMap } from './grid-map.js';
 import { AdjustPanel, canAdjust } from './adjust-panel.js';
+import { Explanation } from './explanation.js';
 
 // ---------------------------------------------------------------- tags
 
@@ -169,8 +170,10 @@ export function ResultPanel(scan, result, { onRerun, adjust } = {}) {
   const viewer = LayerViewer(scan, result);
   const readout = h('div', { class: 'readout-slot' }, Readout(scan, result));
   const lower = h('div', { class: 'lower' }, HeatMap(scan, result), SprayMap(scan, result), CostTable(scan, result));
-  const el = h('div', { class: 'result' }, answer, h('div', { class: 'map-block' }, viewer, readout), adjust || null, lower);
+  const explain = h('div', { class: 'explain-slot' }, Explanation(scan, result));
+  const el = h('div', { class: 'result' }, answer, h('div', { class: 'map-block' }, viewer, readout), adjust || null, lower, explain);
   el.update = (nextScan, nextResult, dirty) => {
+    explain.replaceChildren(Explanation(nextScan, nextResult));
     answer.replaceChildren(...Answer(nextScan, nextResult, false));
     viewer.update(nextScan, nextResult);
     readout.replaceChildren(Readout(nextScan, nextResult, dirty));
