@@ -1,0 +1,55 @@
+{
+  "dataset": "Project-AgML/WE3DS_weed_segmentation",
+  "model": "SegformerForSemanticSegmentation",
+  "backbone": "nvidia/mit-b0",
+  "num_classes": 3,
+  "class_mapping": {
+    "0": "soil",
+    "1": "crop",
+    "2": "weed"
+  },
+  "training": {
+    "configured_epochs": 30,
+    "completed_epochs": 25,
+    "best_epoch": 19,
+    "early_stopping": true,
+    "early_stopping_triggered_after_epoch": 25,
+    "best_checkpoint": "spraywise_best_model",
+    "best_epoch_training_loss": 0.0151,
+    "best_epoch_validation_loss": 0.0484
+  },
+  "validation_metrics_at_best_epoch": {
+    "iou": {
+      "soil": 0.9937,
+      "crop": 0.8607,
+      "weed": 0.6876
+    },
+    "precision": null,
+    "recall": null,
+    "mean_crop_weed_iou": 0.7741443181490458
+  },
+  "test_metrics": {
+    "loss": 0.034781136532116626,
+    "iou": {
+      "soil": 0.99541052,
+      "crop": 0.84889293,
+      "weed": 0.70108212
+    },
+    "precision": {
+      "soil": 0.99951289,
+      "crop": 0.87134689,
+      "weed": 0.73097929
+    },
+    "recall": {
+      "soil": 0.99589363,
+      "crop": 0.97053805,
+      "weed": 0.94487718
+    },
+    "mean_crop_weed_iou": 0.7749875263075492
+  },
+  "notes": [
+    "Validation metrics are from the best checkpoint selected at epoch 19 using mean crop/weed IoU.",
+    "Validation precision and recall were not included in the supplied training log, so they are null rather than inferred.",
+    "The test set was evaluated after training and checkpoint selection."
+  ]
+}

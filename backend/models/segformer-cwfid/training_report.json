@@ -1,0 +1,32 @@
+{
+  "dataset": "CWFID (ml-training/configs/split.json)",
+  "model": "SegformerForSemanticSegmentation",
+  "backbone": "nvidia/mit-b0",
+  "num_classes": 3,
+  "class_mapping": {
+    "0": "soil",
+    "1": "crop",
+    "2": "weed"
+  },
+  "training": {
+    "completed_epochs": 33,
+    "best_epoch": 33,
+    "best_epoch_training_loss": 0.1882062368094921,
+    "best_epoch_validation_loss": 0.2982543669641018,
+    "source_checkpoint": "ml-training/artifacts/checkpoints/best_model.pt"
+  },
+  "validation_metrics_at_best_epoch": {
+    "iou": {
+      "soil": 0.9828618168830872,
+      "crop": 0.6225953698158264,
+      "weed": 0.7543967366218567
+    },
+    "precision": null,
+    "recall": null,
+    "mean_crop_weed_iou": 0.6884960532188416
+  },
+  "notes": [
+    "Converted from the training checkpoint with save_pretrained; the reloaded model was checked to give identical predictions.",
+    "Validation set: 8 CWFID images. Precision and recall were not logged, so they are null."
+  ]
+}
