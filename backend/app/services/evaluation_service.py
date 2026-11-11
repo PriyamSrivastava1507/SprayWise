@@ -4,6 +4,8 @@ Serve the metrics written offline by scripts/evaluate.py.
 Files in EVALUATION_DIR:
     <variant>__<dataset>.json   e.g. classical__cwfid-test.json, ml-we3ds__cwfid-test.json
     training_<key>.json         the ML team's training report for one model
+Each model's folder may also hold training_report.json; it is used unless
+EVALUATION_DIR has a training_<key>.json for the same model.
     classical.json, ml.json, ml_training_report.json   older single-model names
 A missing or unreadable file is simply left out ("Not evaluated yet" in the UI).
 """
@@ -41,6 +43,10 @@ class EvaluationService:
                 entries.append(self._entry(variant, data, dataset_slug))
 
         reports: dict[str, dict[str, Any]] = {}
+        for model in self.models or []:
+            folder_report = self._read_path(Path(model.path) / "training_report.json") if model.path else None
+            if folder_report:
+                reports[model.key] = folder_report
         if legacy_report:
             reports[default_key] = legacy_report
         for path in sorted(self.directory.glob("training_*.json")) if self.directory.is_dir() else []:
@@ -73,7 +79,12 @@ class EvaluationService:
         )
 
     def _read(self, name: str) -> Optional[dict[str, Any]]:
-        path = self.directory / name
+        return self._read_path(self.directory / name)
+
+    @staticmethod
+    def _read_path(path: Path) -> Optional[dict[str, Any]]:
+        if not path.is_file():
+            return None
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except FileNotFoundError:

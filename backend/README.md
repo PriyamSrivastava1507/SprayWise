@@ -88,7 +88,9 @@ python -m scripts.evaluate ../test-dataset/images ../test-dataset/masks --model 
     --dataset "CWFID shared test set" --out data/evaluation/ml-we3ds__cwfid-test.json
 ```
 
-A training report from the ML team goes in `data/evaluation/training_<key>.json`.
+A model's training report from the ML team goes next to its weights as
+`models/<folder>/training_report.json` (committed with the model), and is shown
+on the Evaluation page. A `data/evaluation/training_<key>.json` overrides it locally.
 
 Database: results gained `model_key`. A database made by an older version is
 rebuilt automatically at startup when it has no scans; if it has scans, the

@@ -186,3 +186,21 @@ def test_outdated_database_is_rebuilt_only_when_empty(tmp_path, monkeypatch):
     monkeypatch.setattr(database, "engine", used)
     with pytest.raises(database.OutdatedDatabaseError):
         database._reset_if_outdated()
+
+
+def test_training_reports_from_model_folders(make_client, tmp_path):
+    cwfid_dir, we3ds_dir, eval_dir = tmp_path / "cwfid", tmp_path / "we3ds", tmp_path / "eval"
+    for folder in (cwfid_dir, we3ds_dir, eval_dir):
+        folder.mkdir()
+    (cwfid_dir / "training_report.json").write_text(json.dumps({"dataset": "CWFID", "training": {"best_epoch": 33}}))
+    (we3ds_dir / "training_report.json").write_text(json.dumps({"dataset": "WE3DS (folder)"}))
+    (eval_dir / "training_we3ds.json").write_text(json.dumps({"dataset": "WE3DS (override)"}))
+    models = [
+        {"key": "cwfid", "label": "ML (CWFID)", "backend": "fake", "path": str(cwfid_dir)},
+        {"key": "we3ds", "label": "ML (WE3DS)", "backend": "fake", "path": str(we3ds_dir)},
+        {"key": "none", "label": "No folder", "backend": "fake"},
+    ]
+    reports = make_client(ml_models=models, evaluation_dir=str(eval_dir)).get(f"{API}/evaluation").json()["training_reports"]
+    assert reports["cwfid"] == {"dataset": "CWFID", "training": {"best_epoch": 33}}  # nested data kept as is
+    assert reports["we3ds"]["dataset"] == "WE3DS (override)"  # EVALUATION_DIR wins
+    assert "none" not in reports

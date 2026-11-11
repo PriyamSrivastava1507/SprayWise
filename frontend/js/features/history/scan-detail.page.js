@@ -6,6 +6,7 @@ import { ErrorState } from '../../components/states.js';
 import { toast } from '../../components/toast.js';
 import { ScanView } from '../analyze/scan-results.js';
 import { SideBySide, SwipePanel } from '../compare/compare.page.js';
+import { CompareExplanation } from '../compare/compare-explanation.js';
 
 export async function mount(root, { id }) {
   const ctrl = new AbortController();
@@ -51,6 +52,7 @@ export async function mount(root, { id }) {
     view,
     swipe,
     scan.results.length > 1 ? SideBySide(scan) : null,
+    scan.results.length > 1 ? CompareExplanation(scan) : null,
   ].filter(Boolean));
   return () => { ctrl.abort(); view.dispose(); };
 }

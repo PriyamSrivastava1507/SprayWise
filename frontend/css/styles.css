@@ -481,3 +481,20 @@ tr.total td { font-weight: 650; border-bottom: 0; color: var(--canopy); }
 .explain-body p + p { margin-top: 10px; }
 .explain-body p:last-child { color: var(--muted); font-size: 14px; }
 .result.is-preview .explain { border-color: var(--spray); }
+
+/* ------------------------------------------------------------------ training reports */
+.reports { margin-top: 32px; }
+.reports-title { font-size: 18px; font-weight: 650; }
+.reports .note { margin: 4px 0 14px; max-width: 80ch; }
+.reports-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 20px; align-items: start; }
+.report-head h3 { font-size: 16px; font-weight: 650; }
+.report-head p { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.report-summary { display: grid; gap: 6px; margin: 14px 0 16px; font-size: 14px; }
+.report-summary > div { display: grid; grid-template-columns: 150px 1fr; gap: 12px; }
+.report-summary dt { color: var(--muted); }
+.report-summary dd { font-weight: 550; overflow-wrap: anywhere; }
+.report-table td.dash { font-size: 12.5px; }
+.report-notes { margin: 14px 0 0; padding-left: 18px; font-size: 13px; color: var(--muted); }
+.report-notes li + li { margin-top: 4px; }
+@media (max-width: 860px) { .reports-grid { grid-template-columns: 1fr; } .report-summary > div { grid-template-columns: 1fr; gap: 0; } }
+.report-table th[scope=row] { white-space: nowrap; }

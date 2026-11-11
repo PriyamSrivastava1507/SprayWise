@@ -10,6 +10,7 @@ import { AnalysisForm } from '../analyze/analysis-form.js';
 import { DemoTag, Downloads, PressureTag, ScanMeta, StatusPanel, StatusTag } from '../analyze/scan-results.js';
 import { LayerViewer } from '../analyze/layer-viewer.js';
 import { SwipeView } from './swipe-view.js';
+import { CompareExplanation } from './compare-explanation.js';
 import { currentPhoto } from '../../utils/current-photo.js';
 
 const ROWS = [
@@ -96,7 +97,8 @@ export function CompareView(scan) {
   return h('div', { class: 'compare-view' },
     h('div', { class: 'compare-top' }, ScanMeta(scan, null), switcher),
     body,
-    SideBySide(scan));
+    SideBySide(scan),
+    CompareExplanation(scan));
 }
 
 export function mount(root) {

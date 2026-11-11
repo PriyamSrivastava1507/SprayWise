@@ -16,6 +16,7 @@ class LoadedModel:
     key: str
     label: str
     client: SegmentationClient
+    path: str = ""  # the model's folder (or Hub ID), from ML_MODELS
 
 
 class UnknownModelKey(KeyError):
@@ -39,7 +40,7 @@ class ModelRegistry:
         for i, spec in enumerate(settings.model_specs()):
             client = build_model_client(spec, settings.hf_token, index=i)
             logger.info("model %s (%s): backend=%s ready=%s", spec.key, spec.label, client.backend, client.is_ready())
-            loaded.append(LoadedModel(spec.key, spec.label, client))
+            loaded.append(LoadedModel(spec.key, spec.label, client, spec.path))
         return cls(loaded, settings.default_model_key())
 
     @classmethod

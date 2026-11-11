@@ -7,6 +7,7 @@ import { isAbort } from '../../services/api.js';
 import { evaluationApi } from '../../services/endpoints.js';
 import { ErrorState, EmptyState } from '../../components/states.js';
 import { fmtMs, DASH } from '../../utils/formatters.js';
+import { TrainingReport } from './training-report.js';
 
 const SOIL = 0, CROP = 1, WEED = 2;
 const score = (v) => (v == null ? DASH : Number(v).toFixed(2));
@@ -85,16 +86,6 @@ function notes(data, entries) {
   return out;
 }
 
-function TrainingReport(label, report) {
-  const rows = Object.entries(report).filter(([, v]) => typeof v === 'number' || typeof v === 'string').slice(0, 12);
-  if (!rows.length) return null;
-  return h('section', { class: 'panel' },
-    h('h2', { class: 'panel-title' }, 'Training report: ' + label),
-    h('p', { class: 'note' }, 'As reported by the ML team, measured during training. Not the same test run as the tables.'),
-    h('dl', { class: 'kv' }, rows.map(([k, v]) => [h('dt', {}, k.replace(/_/g, ' ')),
-      h('dd', {}, typeof v === 'number' ? (Math.abs(v) < 10 ? v.toFixed(3) : String(v)) : v)])));
-}
-
 export async function mount(root) {
   const ctrl = new AbortController();
   let data;
@@ -115,7 +106,7 @@ export async function mount(root) {
   }
   const labelOf = (key) => (data.models.find((m) => m.key === key) || { label: key }).label;
 
-  root.replaceChildren(
+  root.replaceChildren(...[
     h('div', { class: 'page-head' }, h('h1', {}, 'Evaluation'),
       h('p', {}, 'Each method and model scored on hand-labelled test photos. One table per test set.')),
     h('div', { class: 'eval-grid' },
@@ -125,7 +116,12 @@ export async function mount(root) {
           : EmptyState('Nothing has been evaluated yet', 'Results appear here once scripts/evaluate.py has scored a method or model on labelled photos.'),
         h('p', { class: 'note' }, 'IoU (intersection over union) compares the pixels labelled as crop or weed with hand-labelled ones: 1.00 is a perfect match. Precision is the share of predicted weed pixels that really are weeds; recall is the share of real weed pixels that were found. The best mean IoU in a table is marked.')),
       h('div', { class: 'eval-side' },
-        notes(data, entries).map(([tone, title, text]) => h('div', { class: 'callout callout-' + tone }, h('h2', {}, title), h('p', {}, text))),
-        Object.entries(data.training_reports || {}).map(([key, report]) => TrainingReport(labelOf(key), report)))));
+        notes(data, entries).map(([tone, title, text]) => h('div', { class: 'callout callout-' + tone }, h('h2', {}, title), h('p', {}, text))))),
+    Object.keys(data.training_reports || {}).length ? h('section', { class: 'reports' },
+      h('h2', { class: 'reports-title' }, 'Training reports'),
+      h('p', { class: 'note' }, 'What each model scored while it was being trained. These come from different photos than the tables above, so compare models with the tables, not with these.'),
+      h('div', { class: 'reports-grid' },
+        Object.entries(data.training_reports).map(([key, report]) => TrainingReport(labelOf(key), report)))) : null,
+  ].filter(Boolean));
   return () => ctrl.abort();
 }

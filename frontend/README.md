@@ -62,6 +62,18 @@ herbicide and money saved, and the assumptions behind them (plus a note
 when the result comes from a demo model). It updates while you adjust and
 recalculate, and **Copy text** puts it on the clipboard for a report.
 
+Compare (and the page of any scan with more than one result) adds **What the
+comparison shows**: which results are missing and why, how far the weed
+estimates and pressure differ, which zones every result marks and on how many
+zones they make the same spray-or-skip decision, and the range of savings.
+
+## Training reports
+
+The Evaluation page shows each model's `training_report.json` (from its model
+folder): a summary, a table of validation and test IoU, precision and recall
+per class, and the ML team's notes. Values the report leaves empty are listed
+as not reported; nothing is filled in.
+
 ## One photo across pages
 
 The photo you choose on Analyze or Compare stays selected when you switch

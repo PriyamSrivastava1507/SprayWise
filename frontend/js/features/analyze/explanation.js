@@ -84,15 +84,22 @@ function paragraphs(scan, result, thresholds) {
   return out;
 }
 
-export function Explanation(scan, result) {
+let boxes = 0;
+
+/**
+ * A "What this means" box. `build(health)` returns the paragraphs as strings;
+ * it runs once at once and again when /health (pressure limits) is known.
+ */
+export function ExplainBox(title, build) {
+  const id = 'explain-title-' + ++boxes;
   const body = h('div', { class: 'explain-body' });
   let text = [];
-  const render = (thresholds) => {
-    text = paragraphs(scan, result, thresholds);
+  const render = (health) => {
+    text = build(health);
     body.replaceChildren(...text.map((t) => h('p', {}, t)));
   };
   render(null);
-  whenHealth().then((health) => render(health && health.pressure_thresholds));
+  whenHealth().then(render);
 
   const copy = h('button', {
     type: 'button', class: 'link-btn',
@@ -106,7 +113,10 @@ export function Explanation(scan, result) {
     },
   }, 'Copy text');
 
-  return h('section', { class: 'explain', 'aria-labelledby': 'explain-title-' + scan.id },
-    h('div', { class: 'explain-head' }, h('h3', { id: 'explain-title-' + scan.id }, 'What this means'), copy),
+  return h('section', { class: 'explain', 'aria-labelledby': id },
+    h('div', { class: 'explain-head' }, h('h3', { id }, title), copy),
     body);
 }
+
+export const Explanation = (scan, result) =>
+  ExplainBox('What this means', (health) => paragraphs(scan, result, health && health.pressure_thresholds));
