@@ -7,7 +7,7 @@ import { fieldsApi, scansApi } from '../../services/endpoints.js';
 import { EmptyState, ErrorState, Loader } from '../../components/states.js';
 import { whenHealth } from '../../components/health.js';
 import { toast } from '../../components/toast.js';
-import { fmtDate, fmtPct, fmtPctWhole, methodLabel, modeLabel, DASH } from '../../utils/formatters.js';
+import { fmtDate, fmtPct, fmtPctWhole, modeLabel, resultLabel, DASH } from '../../utils/formatters.js';
 import { primaryResult } from '../../utils/calculations.js';
 import { PressureTag } from '../analyze/scan-results.js';
 import { TrendChart } from './trend-chart.js';
@@ -18,6 +18,7 @@ export function mount(root) {
   const ctrl = new AbortController();
   let saved = {};
   try { saved = JSON.parse(sessionStorage.getItem(STATE_KEY)) || {}; } catch { /* ignore */ }
+  // Trend source: 'classical' or 'ml:<model key>' ('ml' = the default model).
   const state = { fieldId: saved.fieldId || '', method: saved.method || 'ml', offset: 0 };
   const persist = () => { try { sessionStorage.setItem(STATE_KEY, JSON.stringify(state)); } catch { /* ignore */ } };
 
@@ -27,6 +28,18 @@ export function mount(root) {
   const methodSel = h('select', { id: 'h-method', onchange: (e) => { state.method = e.target.value; persist(); loadTrend(); } },
     h('option', { value: 'ml' }, 'ML segmentation'), h('option', { value: 'classical' }, 'Classical'));
   methodSel.value = state.method;
+  const sourceLabel = () => (methodSel.selectedOptions[0] || {}).textContent || 'ML segmentation';
+  whenHealth().then((health) => {
+    const models = (health && health.models) || [];
+    if (models.length < 2) return; // one model: keep the simple choice
+    methodSel.replaceChildren(
+      ...models.map((m) => h('option', { value: 'ml:' + m.key }, m.label)),
+      h('option', { value: 'classical' }, 'Classical'));
+    const def = models.find((m) => m.default) || models[0];
+    const wanted = state.method === 'ml' ? 'ml:' + def.key : state.method;
+    methodSel.value = [...methodSel.options].some((o) => o.value === wanted) ? wanted : 'ml:' + def.key;
+    if (state.method !== methodSel.value) { state.method = methodSel.value; persist(); loadTrend(); }
+  });
   const methodWrap = h('div', {}, h('label', { for: 'h-method' }, 'Trend method'), methodSel);
   const trend = h('div', {});
   const list = h('div', {});
@@ -52,17 +65,18 @@ export function mount(root) {
     }
     trend.replaceChildren(Loader('Loading trend…'));
     try {
-      const [data, health] = await Promise.all([fieldsApi.trend(state.fieldId, state.method, ctrl.signal), whenHealth()]);
+      const [method, model] = state.method.split(':');
+      const [data, health] = await Promise.all([fieldsApi.trend(state.fieldId, method, model, ctrl.signal), whenHealth()]);
       const name = fieldSel.selectedOptions[0].textContent;
       if (data.points.length < 2) {
         trend.replaceChildren(EmptyState('Not enough scans for a trend yet',
-          name + ' has ' + data.points.length + ' successful ' + methodLabel(state.method) +
+          name + ' has ' + data.points.length + ' successful ' + (data.model_label || sourceLabel()) +
           ' scan' + (data.points.length === 1 ? '' : 's') + '. A trend needs at least two.'));
         return;
       }
       trend.replaceChildren(h('section', { class: 'panel' },
         h('div', { class: 'trend-head' }, h('h2', {}, 'Weed cover over time'),
-          h('p', {}, name + ', ' + methodLabel(state.method) + ', ' + data.points.length + ' scans')),
+          h('p', {}, name + ', ' + (data.model_label || sourceLabel()) + ', ' + data.points.length + ' scans')),
         TrendChart(data.points, health && health.pressure_thresholds)));
     } catch (err) {
       if (!isAbort(err)) trend.replaceChildren(ErrorState(err, loadTrend));
@@ -93,8 +107,8 @@ export function mount(root) {
     const r = primaryResult(scan);
     const actions = h('div', { class: 'row-actions' },
       h('a', { href: '#/scans/' + scan.id }, 'View'),
-      r ? h('a', { href: scansApi.exportUrl(scan.id, 'csv', r.method) }, 'CSV') : null,
-      r ? h('a', { href: scansApi.exportUrl(scan.id, 'pdf', r.method) }, 'PDF') : null,
+      r ? h('a', { href: scansApi.exportUrl(scan.id, 'csv', r) }, 'CSV') : null,
+      r ? h('a', { href: scansApi.exportUrl(scan.id, 'pdf', r) }, 'PDF') : null,
       h('button', { type: 'button', class: 'link-btn danger', onclick: () => askDelete() }, 'Delete'));
 
     function askDelete() {
@@ -117,7 +131,10 @@ export function mount(root) {
       }
     }
 
-    const method = r ? methodLabel(r.method) + (scan.mode === 'compare' ? ' (of both)' : '') : modeLabel(scan.mode);
+    const others = r ? scan.results.filter((x) => x !== r) : [];
+    const method = r
+      ? [resultLabel(r), others.length ? h('span', { class: 'more', title: 'Also: ' + others.map(resultLabel).join(', ') }, ' +' + others.length) : null]
+      : modeLabel(scan.mode);
     const row = h('tr', {},
       h('td', {}, h('a', { href: '#/scans/' + scan.id, class: 'row-link' }, fmtDate(scan.created_at))),
       h('td', {}, scan.field ? scan.field.name : h('span', { class: 'dash' }, 'No field')),

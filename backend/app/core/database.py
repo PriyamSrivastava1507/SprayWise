@@ -81,8 +81,35 @@ def init_db() -> None:
         if db_path and db_path != ":memory:":
             Path(db_path).parent.mkdir(parents=True, exist_ok=True)
 
+    _reset_if_outdated()
     Base.metadata.create_all(engine)
     _add_missing_columns()
+
+
+class OutdatedDatabaseError(RuntimeError):
+    pass
+
+
+def _reset_if_outdated() -> None:
+    """
+    Results gained `model_key` and a new unique rule (scan, method, model).
+    SQLite cannot change a unique rule in place, so an older database is
+    rebuilt when it holds no scans, and otherwise startup stops with advice
+    instead of failing later on the second ML result of a scan.
+    """
+    inspector = inspect(engine)
+    if "scan_results" not in inspector.get_table_names():
+        return
+    if "model_key" in {c["name"] for c in inspector.get_columns("scan_results")}:
+        return
+    with engine.connect() as conn:
+        scans = conn.execute(text("SELECT COUNT(*) FROM scans")).scalar() or 0
+    if scans:
+        raise OutdatedDatabaseError(
+            f"The database at {settings.database_url} was made by an older version "
+            f"and holds {scans} scan(s). Back it up or delete it (and data/media), then start again."
+        )
+    Base.metadata.drop_all(engine)
 
 
 # Columns added after the first release. create_all does not alter existing

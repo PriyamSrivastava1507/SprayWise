@@ -1,6 +1,8 @@
 """Turn database entities into response schemas, so ORM objects never leave the
 service layer and storage keys become URLs in exactly one place."""
 
+from collections.abc import Mapping
+
 from app.clients.base import StorageClient
 from app.models import Scan, ScanResult
 from app.schemas.scan import (
@@ -27,9 +29,14 @@ def _savings(result: ScanResult, scan: Scan) -> Savings:
     )
 
 
-def to_result_out(result: ScanResult, scan: Scan, storage: StorageClient) -> ScanResultOut:
+def to_result_out(
+    result: ScanResult, scan: Scan, storage: StorageClient, labels: Mapping[str, str] = {}
+) -> ScanResultOut:
+    key = result.model_key or None
     return ScanResultOut(
         method=result.method,
+        model_key=key,
+        model_label=(labels.get(key, key) if key else None),
         status=result.status,
         status_detail=result.status_detail,
         model_id=result.model_id,
@@ -46,7 +53,7 @@ def to_result_out(result: ScanResult, scan: Scan, storage: StorageClient) -> Sca
     )
 
 
-def to_scan_detail(scan: Scan, storage: StorageClient) -> ScanDetail:
+def to_scan_detail(scan: Scan, storage: StorageClient, labels: Mapping[str, str] = {}) -> ScanDetail:
     return ScanDetail(
         id=scan.id,
         field=FieldRef(id=scan.field.id, name=scan.field.name) if scan.field else None,
@@ -63,5 +70,5 @@ def to_scan_detail(scan: Scan, storage: StorageClient) -> ScanDetail:
             grid_cols=scan.grid_cols,
             cell_threshold=scan.cell_threshold,
         ),
-        results=[to_result_out(result, scan, storage) for result in scan.results],
+        results=[to_result_out(result, scan, storage, labels) for result in scan.results],
     )

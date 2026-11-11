@@ -5,7 +5,7 @@ import { analysisApi } from '../../services/endpoints.js';
 import { isAbort } from '../../services/api.js';
 import { EmptyState, ErrorState, Loader } from '../../components/states.js';
 import { toast } from '../../components/toast.js';
-import { fmtMs, fmtPct, fmtPctWhole, fmtMoney, methodLabel, DASH } from '../../utils/formatters.js';
+import { fmtMs, fmtPct, fmtPctWhole, fmtMoney, resultLabel, variantOf, DASH } from '../../utils/formatters.js';
 import { AnalysisForm } from '../analyze/analysis-form.js';
 import { DemoTag, Downloads, PressureTag, ScanMeta, StatusPanel, StatusTag } from '../analyze/scan-results.js';
 import { LayerViewer } from '../analyze/layer-viewer.js';
@@ -24,7 +24,7 @@ const ROWS = [
 
 function MethodColumn(scan, result) {
   return h('article', { class: 'method-card' },
-    h('header', {}, h('h2', {}, methodLabel(result.method)),
+    h('header', {}, h('h2', {}, resultLabel(result)),
       h('div', { class: 'tags' }, StatusTag(result), DemoTag(result), result.status === 'ok' ? PressureTag(result.pressure) : null)),
     result.status === 'ok' ? LayerViewer(scan, result) : StatusPanel(scan, result),
     result.status === 'ok' ? h('div', { class: 'method-foot' }, Downloads(scan, result)) : null);
@@ -36,33 +36,59 @@ export function SideBySide(scan) {
     h('div', { class: 'table-wrap' },
       h('table', {},
         h('thead', {}, h('tr', {}, h('th', {}, h('span', { class: 'visually-hidden' }, 'Measure')),
-          scan.results.map((r) => h('th', {}, methodLabel(r.method))))),
+          scan.results.map((r) => h('th', {}, resultLabel(r))))),
         h('tbody', {}, ROWS.map(([label, fn]) => h('tr', {}, h('th', { scope: 'row' }, label),
           scan.results.map((r) => { const v = fn(r, scan); return h('td', { class: v === DASH ? 'dash' : null }, v); })))))),
     h('p', { class: 'note' }, 'Differences show where the methods disagree, not which one is right. Accuracy on labelled photos is on the Evaluation page.'));
 }
 
-export function CompareView(scan) {
+/**
+ * Swipe between two results over the same photo. With more than two
+ * successful results, two dropdowns choose the left and right sides.
+ * Returns null when fewer than two results can be shown.
+ */
+export function SwipePanel(scan) {
   const ok = scan.results.filter((r) => r.status === 'ok' && r.mask_url);
-  const canSwipe = ok.length === 2;
+  if (ok.length < 2) return null;
+  let left = ok[0], right = ok[1];
   const body = h('div', {});
-  let view = canSwipe ? 'swipe' : 'columns';
+  const draw = () => body.replaceChildren(SwipeView(scan, left, right));
+
+  let pickers = null;
+  if (ok.length > 2) {
+    const select = (id, text, current, set) => {
+      const el = h('select', { id, onchange: (e) => { set(ok.find((r) => variantOf(r) === e.target.value)); draw(); } },
+        ok.map((r) => h('option', { value: variantOf(r) }, resultLabel(r))));
+      el.value = variantOf(current);
+      return h('div', {}, h('label', { for: id }, text), el);
+    };
+    pickers = h('div', { class: 'swipe-pickers' },
+      select('swipe-left', 'Left side', left, (r) => { left = r; }),
+      select('swipe-right', 'Right side', right, (r) => { right = r; }));
+  }
+  draw();
+  return h('div', { class: 'swipe-panel-body' }, pickers, body);
+}
+
+export function CompareView(scan) {
+  const swipe = SwipePanel(scan);
+  const body = h('div', {});
+  let view = swipe ? 'swipe' : 'columns';
 
   const options = [['swipe', 'Swipe'], ['columns', 'Side by side']];
   const buttons = options.map(([value, text]) => h('button', {
-    type: 'button', 'aria-pressed': String(view === value), disabled: value === 'swipe' && !canSwipe,
+    type: 'button', 'aria-pressed': String(view === value), disabled: value === 'swipe' && !swipe,
     onclick: () => { view = value; render(); },
   }, text));
   const switcher = h('div', { class: 'view-switch' },
     h('div', { class: 'seg seg-2', role: 'group', 'aria-label': 'Comparison view' }, buttons),
-    canSwipe ? null : h('span', { class: 'note-inline' }, 'Swipe needs a successful result from both methods.'));
+    swipe ? null : h('span', { class: 'note-inline' }, 'Swipe needs two successful results.'));
 
+  const columns = h('div', { class: 'compare-cols cols-' + Math.min(scan.results.length, 3) },
+    scan.results.map((r) => MethodColumn(scan, r)));
   function render() {
     buttons.forEach((b, i) => b.setAttribute('aria-pressed', String(options[i][0] === view)));
-    const [classical, ml] = ['classical', 'ml'].map((m) => scan.results.find((r) => r.method === m));
-    body.replaceChildren(view === 'swipe'
-      ? SwipeView(scan, classical, ml)
-      : h('div', { class: 'compare-cols' }, scan.results.map((r) => MethodColumn(scan, r))));
+    body.replaceChildren(view === 'swipe' ? swipe : columns);
   }
   render();
 
@@ -75,14 +101,14 @@ export function CompareView(scan) {
 export function mount(root) {
   const ctrl = new AbortController();
   const out = h('section', { class: 'compare-out', 'aria-live': 'polite' },
-    EmptyState('Nothing to compare yet', 'Choose a photo and both methods run on it. Their maps and numbers appear here side by side.'));
+    EmptyState('Nothing to compare yet', 'Choose a photo and tick what to compare: classical, one or more ML models. Their maps and numbers appear here side by side.'));
 
   const form = AnalysisForm({
-    fixedMode: 'compare',
+    chooser: true,
     title: 'Compare on a photo',
-    submitLabel: 'Run both methods',
+    submitLabel: 'Run comparison',
     onSubmit: async (fd) => {
-      out.replaceChildren(Loader('Running classical and ML on the photo…'));
+      out.replaceChildren(Loader('Running the comparison on the photo…'));
       try {
         const scan = await analysisApi.analyze(fd, ctrl.signal);
         out.replaceChildren(CompareView(scan));
@@ -97,7 +123,7 @@ export function mount(root) {
 
   root.replaceChildren(
     h('div', { class: 'page-head' }, h('h1', {}, 'Compare methods'),
-      h('p', {}, 'Classical finds crop rows by colour and geometry. ML segmentation labels every pixel with a trained model.')),
+      h('p', {}, 'Classical finds crop rows by colour and geometry. Each ML model labels every pixel; models trained on different datasets can disagree.')),
     h('div', { class: 'compare-layout' }, h('aside', { class: 'workspace-side' }, form), out));
   return () => ctrl.abort();
 }

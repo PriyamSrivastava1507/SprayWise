@@ -26,7 +26,7 @@ def test_success_shape(client):
     assert [r["method"] for r in body["results"]] == ["classical", "ml"]
     first = body["results"][0]
     assert set(first) == {
-        "method", "status", "status_detail", "model_id", "vegetation_pct", "crop_pct",
+        "method", "model_key", "model_label", "status", "status_detail", "model_id", "vegetation_pct", "crop_pct",
         "weed_pct", "pressure", "overlay_url", "mask_url", "grid", "spray_cells", "savings",
         "processing_ms",
     }

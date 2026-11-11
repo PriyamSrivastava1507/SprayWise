@@ -7,6 +7,7 @@ while a slider moves; with save=True the scan's settings and results are updated
 
 import io
 import logging
+from collections.abc import Mapping
 
 import numpy as np
 from PIL import Image
@@ -25,10 +26,11 @@ logger = logging.getLogger(__name__)
 
 
 class RecalculationService:
-    def __init__(self, scans: ScanRepository, storage: StorageClient, settings: Settings):
+    def __init__(self, scans: ScanRepository, storage: StorageClient, settings: Settings, labels: Mapping[str, str] = {}):
         self.scans = scans
         self.storage = storage
         self.settings = settings
+        self.labels = labels
 
     def recalculate(self, scan_id: int, new: ScanSettings, save: bool) -> ScanDetail:
         scan = self.scans.get(scan_id)
@@ -61,7 +63,7 @@ class RecalculationService:
                 result.saved_litres = savings["saved_litres"]
                 result.saved_pct = savings["saved_pct"]
 
-            detail = to_scan_detail(scan, self.storage)
+            detail = to_scan_detail(scan, self.storage, self.labels)
             if save:
                 self.scans.commit()
                 logger.info("scan %s recalculated and saved", scan_id)

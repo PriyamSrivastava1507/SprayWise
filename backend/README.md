@@ -57,6 +57,43 @@ Docker: `docker build -t spraywise-backend . && docker run -p 8000:8000 -v spray
 - In `compare` mode, a failing method never hides the other: the response is 201 with both results.
 - `ml` mode with no model is a 503; `compare` returns the classical result and marks ML `model_unavailable`.
 
+## Several ML models
+
+Set `ML_MODELS` (a JSON list) and `DEFAULT_ML_MODEL` in `.env`:
+
+```
+ML_MODELS=[{"key":"cwfid","label":"ML (CWFID)","path":"./models/segformer-cwfid"},{"key":"we3ds","label":"ML (WE3DS)","path":"./models/segformer-we3ds"}]
+DEFAULT_ML_MODEL=cwfid
+```
+
+- Each model loads on its own: one that fails is reported offline (with the
+  reason in `/health` and `/models`) and the others keep working.
+- `POST /analyze` takes `models=cwfid,we3ds`. `ml` mode runs the chosen models
+  (the default model if none); `compare` runs classical plus the chosen models.
+  With several runs, one that fails is marked in its result and the rest are
+  returned (201). `ml` mode where none of the chosen models works is 503.
+- Results carry `model_key` and `model_label`. Exports take `?model=`
+  (`scan_7_ml-we3ds.pdf`), the trend takes `?model=` (default model if empty).
+- `GET /models` lists the models; `/health` has them under `models`.
+- Model folders hold `*.safetensors`, which the root `.gitignore` excludes:
+  share them outside git, or with `git add -f`, Git LFS or the Hugging Face Hub.
+- Without `ML_MODELS` everything works as before, with one model under the key
+  `default`.
+
+Evaluate each model on each test set and name the files
+`<variant>__<test-set>.json`; `/evaluation` lists them all:
+
+```bash
+python -m scripts.evaluate ../test-dataset/images ../test-dataset/masks --model we3ds \
+    --dataset "CWFID shared test set" --out data/evaluation/ml-we3ds__cwfid-test.json
+```
+
+A training report from the ML team goes in `data/evaluation/training_<key>.json`.
+
+Database: results gained `model_key`. A database made by an older version is
+rebuilt automatically at startup when it has no scans; if it has scans, the
+app stops with a message (delete `data/spraywise.db` and `data/media/`).
+
 ## When the real ML model arrives
 
 ```bash

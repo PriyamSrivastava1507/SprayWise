@@ -7,7 +7,7 @@ import { scansApi } from '../../services/endpoints.js';
 import { whenHealth } from '../../components/health.js';
 import { pressurePosition } from '../../utils/calculations.js';
 import {
-  fmtDate, fmtLitres, fmtMoney, fmtMs, fmtNumber, fmtFixed, fmtPct, isDemo, methodLabel,
+  fmtDate, fmtLitres, fmtMoney, fmtMs, fmtNumber, fmtFixed, fmtPct, isDemo, resultLabel, variantOf,
 } from '../../utils/formatters.js';
 import { LayerViewer } from './layer-viewer.js';
 import { HeatMap, SprayMap } from './grid-map.js';
@@ -56,7 +56,7 @@ export function StatusPanel(scan, result, { onRerun } = {}) {
     title = 'The ML model is offline';
     text = (result.status_detail ? result.status_detail.replace(/\.?$/, '. ') : '') + 'Classical results are not affected.';
   } else {
-    title = methodLabel(result.method) + ' failed on this photo';
+    title = resultLabel(result) + ' failed on this photo';
     text = FAIL_REASONS[result.status_detail] || 'Try again, or use the other method.';
   }
   return h('div', { class: 'blocked', style: { backgroundImage: `url("${mediaUrl(scan.original_url)}")` } },
@@ -136,8 +136,8 @@ export function Downloads(scan, result, dirty = false) {
       h('button', { type: 'button', class: 'btn btn-quiet', disabled: true, title: 'Save the new settings to download them' }, 'PDF report'));
   }
   return h('div', { class: 'downloads' },
-    h('a', { class: 'btn btn-quiet', href: scansApi.exportUrl(scan.id, 'csv', result.method) }, 'CSV'),
-    h('a', { class: 'btn btn-quiet', href: scansApi.exportUrl(scan.id, 'pdf', result.method) }, 'PDF report'));
+    h('a', { class: 'btn btn-quiet', href: scansApi.exportUrl(scan.id, 'csv', result) }, 'CSV'),
+    h('a', { class: 'btn btn-quiet', href: scansApi.exportUrl(scan.id, 'pdf', result) }, 'PDF report'));
 }
 
 function CostTable(scan, result) {
@@ -187,7 +187,7 @@ export function ScanMeta(scan, result, extra) {
     h('strong', {}, scan.field ? scan.field.name : 'No field'),
     h('a', { href: '#/scans/' + scan.id }, 'Scan ' + scan.id),
     h('span', {}, h('time', { datetime: scan.created_at }, fmtDate(scan.created_at))),
-    result ? h('span', { class: 'tag' }, methodLabel(result.method)) : null,
+    result ? h('span', { class: 'tag' }, resultLabel(result)) : null,
     result ? StatusTag(result) : null,
     result ? DemoTag(result) : null,
     extra || null);
@@ -197,8 +197,8 @@ export function ScanView(scan, { method, onRerun } = {}) {
   const root = h('div', { class: 'scan-view' });
   let shown = scan;        // what is on screen: saved, or a preview
   let dirty = false;
-  let active = (scan.results.find((r) => r.method === method) ||
-    scan.results.find((r) => r.status === 'ok') || scan.results[0]).method;
+  let active = variantOf(scan.results.find((r) => variantOf(r) === method || r.method === method) ||
+    scan.results.find((r) => r.status === 'ok') || scan.results[0]);
   let panel = null;
 
   const adjust = canAdjust(scan) ? AdjustPanel(scan, {
@@ -206,7 +206,7 @@ export function ScanView(scan, { method, onRerun } = {}) {
     onSaved: (next) => { shown = next; dirty = false; refresh(); },
   }) : null;
 
-  const resultOf = (s) => s.results.find((r) => r.method === active);
+  const resultOf = (s) => s.results.find((r) => variantOf(r) === active);
 
   function refresh() {
     const r = resultOf(shown);
@@ -218,9 +218,9 @@ export function ScanView(scan, { method, onRerun } = {}) {
     const tabs = shown.results.length > 1
       ? h('div', { class: 'method-tabs', role: 'tablist', 'aria-label': 'Method' },
         shown.results.map((r) => h('button', {
-          type: 'button', role: 'tab', 'aria-selected': String(r.method === active),
-          onclick: () => { active = r.method; show(); },
-        }, methodLabel(r.method), r.status !== 'ok' ? h('span', { class: 'tab-note' }, 'no result') : null)))
+          type: 'button', role: 'tab', 'aria-selected': String(variantOf(r) === active),
+          onclick: () => { active = variantOf(r); show(); },
+        }, resultLabel(r), r.status !== 'ok' ? h('span', { class: 'tab-note' }, 'no result') : null)))
       : null;
     panel = ResultPanel(shown, result, { onRerun, adjust: result.status === 'ok' ? adjust : null });
     if (dirty) panel.update(shown, result, true);

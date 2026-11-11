@@ -7,7 +7,7 @@ from app.clients.base import SegmentationClient, StorageClient
 from app.clients.segmentation_fake import FakeSegmentationClient
 from app.clients.segmentation_hf import HFSegformerClient
 from app.clients.storage_local import LocalStorageClient
-from app.core.config import Settings
+from app.core.config import ModelSpec, Settings
 from app.core.exceptions import ModelUnavailableError
 
 logger = logging.getLogger(__name__)
@@ -32,6 +32,27 @@ class UnavailableSegmentationClient:
 
     def predict(self, rgb: np.ndarray) -> np.ndarray:
         raise ModelUnavailableError(self.detail or "The ML model is not loaded")
+
+
+def build_model_client(spec: ModelSpec, token: Optional[str] = None, index: int = 0) -> SegmentationClient:
+    """Create the client for one model. A model that cannot load becomes
+    "unavailable" with the reason, so the app and other models keep working."""
+    if spec.backend == "hf":
+        try:
+            return HFSegformerClient(model_id=spec.path, token=token)
+        except Exception as exc:
+            logger.exception("Could not load model %s (%s)", spec.key, spec.path)
+            reason = f"{type(exc).__name__}: {exc}"[:_MAX_DETAIL_CHARS]
+            return UnavailableSegmentationClient(
+                model_id=spec.path,
+                detail=f"Could not load the ML model ({reason})",
+            )
+    if spec.backend == "unavailable":
+        return UnavailableSegmentationClient(
+            model_id=spec.path or spec.key,
+            detail=f"The model '{spec.label}' is switched off (backend=unavailable)",
+        )
+    return FakeSegmentationClient(weed_side="right" if index % 2 == 0 else "left")
 
 
 def build_segmentation_client(settings: Settings) -> SegmentationClient:

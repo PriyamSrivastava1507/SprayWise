@@ -5,8 +5,7 @@ import { scansApi } from '../../services/endpoints.js';
 import { ErrorState } from '../../components/states.js';
 import { toast } from '../../components/toast.js';
 import { ScanView } from '../analyze/scan-results.js';
-import { SideBySide } from '../compare/compare.page.js';
-import { SwipeView } from '../compare/swipe-view.js';
+import { SideBySide, SwipePanel } from '../compare/compare.page.js';
 
 export async function mount(root, { id }) {
   const ctrl = new AbortController();
@@ -39,21 +38,13 @@ export async function mount(root, { id }) {
     } catch (err) {
       toast(err.message, { tone: 'error' });
       idle();
-
-  const view = ScanView(scan);
-  const [classical, ml] = ['classical', 'ml'].map((m) => scan.results.find((r) => r.method === m));
-  const swipe = classical && ml && [classical, ml].every((r) => r.status === 'ok' && r.mask_url)
-    ? h('section', { class: 'panel swipe-panel' }, h('h2', { class: 'panel-title' }, 'Swipe between methods'), SwipeView(scan, classical, ml))
-    : null;
     }
   }
   idle();
 
   const view = ScanView(scan);
-  const [classical, ml] = ['classical', 'ml'].map((m) => scan.results.find((r) => r.method === m));
-  const swipe = classical && ml && [classical, ml].every((r) => r.status === 'ok' && r.mask_url)
-    ? h('section', { class: 'panel swipe-panel' }, h('h2', { class: 'panel-title' }, 'Swipe between methods'), SwipeView(scan, classical, ml))
-    : null;
+  const swipeBody = SwipePanel(scan);
+  const swipe = swipeBody ? h('section', { class: 'panel swipe-panel' }, h('h2', { class: 'panel-title' }, 'Swipe between results'), swipeBody) : null;
 
   root.replaceChildren(...[
     h('div', { class: 'detail-bar' }, back, actions),

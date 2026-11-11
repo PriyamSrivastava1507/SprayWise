@@ -10,6 +10,14 @@ class ModelStatus(BaseModel):
     detail: Optional[str] = None  # why the model is not ready
 
 
+class ModelInfo(ModelStatus):
+    """One configured ML model (GET /models and the `models` list in /health)."""
+
+    key: str  # used in requests: models=cwfid,we3ds
+    label: str  # shown to people
+    default: bool
+
+
 class PressureThresholds(BaseModel):
     """Weed % limits: Low below low_max, High from high_min, Medium between."""
 
@@ -20,5 +28,6 @@ class PressureThresholds(BaseModel):
 class HealthResponse(BaseModel):
     status: Literal["ok", "degraded"]  # degraded = the database is not reachable
     database: Literal["ok", "error"]
-    model: ModelStatus
+    model: ModelStatus  # the default model (kept for older clients)
+    models: list[ModelInfo]  # every configured model
     pressure_thresholds: PressureThresholds

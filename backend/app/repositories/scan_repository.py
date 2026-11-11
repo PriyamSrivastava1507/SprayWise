@@ -79,7 +79,7 @@ class ScanRepository:
 
     # Sequence, not list: this class defines a method called `list`, which shadows the
     # built-in for every annotation written after it.
-    def trend(self, field_id: int, method: Union[Method, str]) -> Sequence[TrendRow]:
+    def trend(self, field_id: int, method: Union[Method, str], model_key: str = "") -> Sequence[TrendRow]:
         """Weed % and saved % over time for one field and one method.
         Only successful results: a failed run has no statistics to plot."""
         method_value = method.value if isinstance(method, Method) else str(method)
@@ -89,6 +89,7 @@ class ScanRepository:
             .where(
                 Scan.field_id == field_id,
                 ScanResult.method == method_value,
+                ScanResult.model_key == model_key,
                 ScanResult.status == ResultStatus.OK.value,
             )
             .order_by(Scan.created_at, Scan.id)

@@ -25,6 +25,10 @@ export const currencySymbol = () =>
   (money.formatToParts(0).find((p) => p.type === 'currency') || { value: '' }).value;
 
 export const methodLabel = (m) => (m === 'ml' ? 'ML segmentation' : 'Classical');
+/** A result's name: "Classical", or the ML model's label such as "ML (WE3DS)". */
+export const resultLabel = (r) => (r.method === 'classical' ? 'Classical' : (r.model_label || 'ML segmentation'));
+/** A result's unique id within a scan: "classical" or "ml-<model key>". */
+export const variantOf = (r) => (r.method === 'classical' ? 'classical' : 'ml-' + (r.model_key || 'default'));
 export const modeLabel = (m) => ({ classical: 'Classical', ml: 'ML segmentation', compare: 'Both methods' }[m] || m);
 
 export const DEMO_MODEL_ID = 'fake-demo-model';

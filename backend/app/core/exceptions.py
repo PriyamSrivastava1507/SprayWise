@@ -40,3 +40,11 @@ class ConflictError(AppError):
 
     status_code = 409
     code = "conflict"
+
+
+class InvalidParameterError(AppError):
+    """A request value that passed type checks but is not acceptable, such as
+    an unknown model key. Same code as other validation failures."""
+
+    status_code = 422
+    code = "validation_error"

@@ -3,6 +3,7 @@
 import csv
 import io
 import logging
+from collections.abc import Mapping
 from typing import Optional
 from xml.sax.saxutils import escape
 
@@ -30,14 +31,15 @@ LIMITATIONS = (
 
 
 class ExportService:
-    def __init__(self, scans: ScanRepository, storage: StorageClient):
+    def __init__(self, scans: ScanRepository, storage: StorageClient, labels: Mapping[str, str] = {}):
         self.scans = scans
         self.storage = storage
+        self.labels = labels
 
     # ------------------------------------------------------------------ public
 
-    def csv(self, scan_id: int, method: Optional[str]) -> tuple[str, bytes]:
-        scan, result = self._pick(scan_id, method)
+    def csv(self, scan_id: int, method: Optional[str], model: Optional[str] = None) -> tuple[str, bytes]:
+        scan, result = self._pick(scan_id, method, model)
         spray = {(r, c) for r, c in (result.spray_cells or [])}
         buffer = io.StringIO(newline="")
         writer = csv.writer(buffer)
@@ -45,22 +47,28 @@ class ExportService:
         for r, line in enumerate(result.grid or []):
             for c, density in enumerate(line):
                 writer.writerow([r, c, round(density, 4), int((r, c) in spray)])
-        return f"scan_{scan.id}_{result.method}.csv", buffer.getvalue().encode("utf-8")
+        return f"scan_{scan.id}_{_variant(result)}.csv", buffer.getvalue().encode("utf-8")
 
-    def pdf(self, scan_id: int, method: Optional[str]) -> tuple[str, bytes]:
-        scan, result = self._pick(scan_id, method)
-        return f"scan_{scan.id}_{result.method}.pdf", self._build_pdf(scan, result)
+    def pdf(self, scan_id: int, method: Optional[str], model: Optional[str] = None) -> tuple[str, bytes]:
+        scan, result = self._pick(scan_id, method, model)
+        return f"scan_{scan.id}_{_variant(result)}.pdf", self._build_pdf(scan, result)
 
     # ----------------------------------------------------------------- helpers
 
-    def _pick(self, scan_id: int, method: Optional[str]) -> tuple[Scan, ScanResult]:
+    def _pick(self, scan_id: int, method: Optional[str], model: Optional[str] = None) -> tuple[Scan, ScanResult]:
         scan = self.scans.get(scan_id)
         if scan is None:
             raise NotFoundError(f"Scan {scan_id} does not exist.")
         ok = [r for r in scan.results if r.status == ResultStatus.OK.value]
-        chosen = next((r for r in ok if method is None or r.method == method), None)
+        chosen = next(
+            (
+                r for r in ok
+                if (method is None or r.method == method) and (model is None or r.model_key == model)
+            ),
+            None,
+        )
         if chosen is None:
-            raise NotFoundError("No successful result for that method.")
+            raise NotFoundError("No successful result for that method or model.")
         return scan, chosen
 
     def _image(self, key: Optional[str], max_w: float, max_h: float):
@@ -91,7 +99,11 @@ class ExportService:
             ),
         ]
 
-        method_label = "Classical (colour index + crop rows)" if result.method == "classical" else "ML (SegFormer)"
+        if result.method == "classical":
+            method_label = "Classical (colour index + crop rows)"
+        else:
+            name = self.labels.get(result.model_key, result.model_key) if result.model_key else "ML"
+            method_label = escape(f"{name}, SegFormer segmentation")
         story.append(Paragraph(f"<b>Method:</b> {method_label}", body))
         if result.model_id:
             story.append(Paragraph(f"<b>Model:</b> {escape(result.model_id)}", body))
@@ -179,3 +191,7 @@ class ExportService:
             topMargin=15 * mm, bottomMargin=15 * mm, title=f"SprayWise scan {scan.id}",
         ).build(story)
         return buffer.getvalue()
+
+
+def _variant(result: ScanResult) -> str:
+    return f"{result.method}-{result.model_key}" if result.model_key else result.method

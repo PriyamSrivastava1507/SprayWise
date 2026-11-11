@@ -43,7 +43,7 @@ def test_csv_export(client):
 def test_export_picks_requested_method(client):
     scan = post(client, {"mode": "compare"}).json()
     ml = client.get(f"{API}/scans/{scan['id']}/export/csv", params={"method": "ml"})
-    assert "_ml.csv" in ml.headers["content-disposition"]
+    assert "_ml-default.csv" in ml.headers["content-disposition"]
     default = client.get(f"{API}/scans/{scan['id']}/export/csv")
     assert "_classical.csv" in default.headers["content-disposition"]  # first ok result
 
@@ -53,7 +53,7 @@ def test_export_errors(make_client, client):
     scan = post(client).json()  # classical only
     response = client.get(f"{API}/scans/{scan['id']}/export/csv", params={"method": "ml"})
     assert response.status_code == 404
-    assert error_of(response)["message"] == "No successful result for that method."
+    assert error_of(response)["message"] == "No successful result for that method or model."
     assert client.get(f"{API}/scans/{scan['id']}/export/csv", params={"method": "x"}).status_code == 422
 
     unavailable = make_client("unavailable")
@@ -70,7 +70,8 @@ def test_pdf_export(client):
         assert response.status_code == 200
         assert response.headers["content-type"] == "application/pdf"
         assert response.content.startswith(b"%PDF") and len(response.content) > 2000
-        assert f"scan_{scan['id']}_{method}.pdf" in response.headers["content-disposition"]
+        expected = "classical" if method == "classical" else "ml-default"
+        assert f"scan_{scan['id']}_{expected}.pdf" in response.headers["content-disposition"]
 
 
 def test_pdf_survives_missing_image_file(client):
@@ -92,9 +93,10 @@ def test_pdf_survives_missing_image_file(client):
 
 def test_evaluation_missing_files_are_null(make_client, tmp_path):
     client = make_client(evaluation_dir=str(tmp_path / "none"))
-    assert client.get(f"{API}/evaluation").json() == {
-        "classical": None, "ml": None, "ml_training_report": None,
-    }
+    body = client.get(f"{API}/evaluation").json()
+    assert body["classical"] is None and body["ml"] is None and body["ml_training_report"] is None
+    assert body["entries"] == [] and body["training_reports"] == {}
+    assert body["models"] == [{"key": "default", "label": "ML segmentation"}]
 
 
 def test_evaluation_reads_files(make_client, tmp_path):

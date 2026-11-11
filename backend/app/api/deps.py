@@ -7,7 +7,8 @@ from typing import Annotated
 from fastapi import Depends, Request
 from sqlalchemy.orm import Session
 
-from app.clients.base import SegmentationClient, StorageClient
+from app.clients.base import StorageClient
+from app.clients.registry import ModelRegistry
 from app.core.config import Settings
 from app.core.database import SessionLocal
 from app.repositories.field_repository import FieldRepository
@@ -36,27 +37,27 @@ def get_storage(request: Request) -> StorageClient:
     return request.app.state.storage
 
 
-def get_segmenter(request: Request) -> SegmentationClient:
-    return request.app.state.segmenter
+def get_models(request: Request) -> ModelRegistry:
+    return request.app.state.models
 
 
 DbDep = Annotated[Session, Depends(get_db)]
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 StorageDep = Annotated[StorageClient, Depends(get_storage)]
-SegmenterDep = Annotated[SegmentationClient, Depends(get_segmenter)]
+ModelsDep = Annotated[ModelRegistry, Depends(get_models)]
 
 
 def get_analysis_service(
     db: DbDep,
     storage: StorageDep,
-    segmenter: SegmenterDep,
+    models: ModelsDep,
     settings: SettingsDep,
 ) -> AnalysisService:
     return AnalysisService(
         scans=ScanRepository(db),
         fields=FieldRepository(db),
         storage=storage,
-        segmenter=segmenter,
+        models=models,
         settings=settings,
     )
 
@@ -64,32 +65,32 @@ def get_analysis_service(
 AnalysisServiceDep = Annotated[AnalysisService, Depends(get_analysis_service)]
 
 
-def get_scan_service(db: DbDep, storage: StorageDep) -> ScanService:
-    return ScanService(ScanRepository(db), storage)
+def get_scan_service(db: DbDep, storage: StorageDep, models: ModelsDep) -> ScanService:
+    return ScanService(ScanRepository(db), storage, models.labels())
 
 
-def get_field_service(db: DbDep) -> FieldService:
-    return FieldService(FieldRepository(db), ScanRepository(db))
+def get_field_service(db: DbDep, models: ModelsDep) -> FieldService:
+    return FieldService(FieldRepository(db), ScanRepository(db), models)
 
 
 ScanServiceDep = Annotated[ScanService, Depends(get_scan_service)]
 FieldServiceDep = Annotated[FieldService, Depends(get_field_service)]
 
 
-def get_export_service(db: DbDep, storage: StorageDep) -> ExportService:
-    return ExportService(ScanRepository(db), storage)
+def get_export_service(db: DbDep, storage: StorageDep, models: ModelsDep) -> ExportService:
+    return ExportService(ScanRepository(db), storage, models.labels())
 
 
-def get_evaluation_service(settings: SettingsDep) -> EvaluationService:
-    return EvaluationService(settings.evaluation_dir)
+def get_evaluation_service(settings: SettingsDep, models: ModelsDep) -> EvaluationService:
+    return EvaluationService(settings.evaluation_dir, models)
 
 
 ExportServiceDep = Annotated[ExportService, Depends(get_export_service)]
 EvaluationServiceDep = Annotated[EvaluationService, Depends(get_evaluation_service)]
 
 
-def get_recalculation_service(db: DbDep, storage: StorageDep, settings: SettingsDep) -> RecalculationService:
-    return RecalculationService(ScanRepository(db), storage, settings)
+def get_recalculation_service(db: DbDep, storage: StorageDep, settings: SettingsDep, models: ModelsDep) -> RecalculationService:
+    return RecalculationService(ScanRepository(db), storage, settings, models.labels())
 
 
 RecalculationServiceDep = Annotated[RecalculationService, Depends(get_recalculation_service)]

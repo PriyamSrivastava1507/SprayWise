@@ -17,11 +17,16 @@ function describe(health) {
   const api = health.database === 'ok'
     ? { tone: 'ok', text: 'API connected' }
     : { tone: 'bad', text: 'Database error', title: 'The server is up but cannot reach its database.' };
-  const m = health.model;
+  const models = health.models && health.models.length ? health.models : [{ ...health.model, label: 'ML model' }];
+  const ready = models.filter((m) => m.ready);
+  const demo = ready.filter((m) => m.model_id === DEMO_MODEL_ID);
+  const title = models.map((m) => m.label + ': ' + (!m.ready ? 'offline' + (m.detail ? ' (' + m.detail + ')' : '')
+    : m.model_id === DEMO_MODEL_ID ? 'demo model' : 'ready')).join('\n');
   let model;
-  if (!m.ready) model = { tone: 'bad', text: 'ML offline', title: m.detail || 'The ML model is not loaded.' };
-  else if (m.model_id === DEMO_MODEL_ID) model = { tone: 'warn', text: 'ML: demo model', title: 'ML results come from a placeholder, not a trained model.' };
-  else model = { tone: 'ok', text: 'ML ready', title: m.model_id };
+  if (!ready.length) model = { tone: 'bad', text: 'ML offline', title };
+  else if (ready.length < models.length) model = { tone: 'warn', text: 'ML: ' + ready.length + ' of ' + models.length + ' models ready', title };
+  else if (demo.length === ready.length) model = { tone: 'warn', text: models.length > 1 ? 'ML: demo models' : 'ML: demo model', title };
+  else model = { tone: 'ok', text: models.length > 1 ? 'ML: ' + models.length + ' models ready' : 'ML ready', title };
   return [api, model];
 }
 
@@ -37,7 +42,7 @@ export function startHealth(el) {
       h('span', { class: 'status-item', title: s.title || null },
         h('i', { class: 'dot dot-' + s.tone, 'aria-hidden': 'true' }), s.text)));
     // Poll quickly while something is wrong (cold start), slowly once healthy.
-    const healthy = health && health.database === 'ok' && health.model.ready;
+    const healthy = health && health.database === 'ok' && (health.models || [health.model]).every((m) => m.ready);
     clearTimeout(timer);
     timer = setTimeout(check, healthy ? 60000 : 10000);
   }

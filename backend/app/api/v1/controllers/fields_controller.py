@@ -1,6 +1,6 @@
 """Fields and the weed trend of one field."""
 
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Optional
 
 from fastapi import APIRouter, Query
 
@@ -37,5 +37,6 @@ def field_trend(
     field_id: int,
     service: FieldServiceDep,
     method: Annotated[Literal["classical", "ml"], Query()] = "classical",
+    model: Annotated[Optional[str], Query(description="ML model key; the default model if empty")] = None,
 ) -> TrendResponse:
-    return service.trend(field_id, method)
+    return service.trend(field_id, method, model or None)
